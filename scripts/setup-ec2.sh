@@ -65,7 +65,8 @@ install_system_deps() {
   case "$DISTRO" in
     amzn|al2023)
       dnf update -y -q
-      dnf install -y git curl nginx
+      # --allowerasing reemplaza curl-minimal por curl completo sin conflicto
+      dnf install -y --allowerasing git curl nginx
       ;;
     ubuntu|debian)
       apt-get update -qq
