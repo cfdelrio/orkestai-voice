@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id             String           @id @default(uuid())
+  name           String
+  slug           String           @unique
+  metadata       Json             @default("{}")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  providerConfig ProviderConfig[]
+  campaigns      Campaign[]
+  contacts       Contact[]
+}
+
+model ProviderConfig {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  provider   String   // "infobip"
+  apiKey     String
+  baseUrl    String
+  fromNumber String
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Campaign {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  status      String              @default("draft") // draft, active, completed, paused
+  metadata    Json                @default("{}")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  flow        VoiceFlow?
+  recipients  CampaignRecipient[]
+  calls       Call[]
+}
+
+model VoiceFlow {
+  id         String   @id @default(uuid())
+  campaignId String   @unique
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  steps      Json     // array of steps: say, dtmf_question, goodbye
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Contact {
+  id         String              @id @default(uuid())
+  tenantId   String
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  firstName  String
+  lastName   String?
+  phone      String
+  email      String?
+  metadata   Json                @default("{}")
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  recipients CampaignRecipient[]
+}
+
+model CampaignRecipient {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+  contactId  String
+  contact    Contact  @relation(fields: [contactId], references: [id])
+  status     String   @default("pending") // pending, called, failed
+  createdAt  DateTime @default(now())
+  calls      Call[]
+}
+
+model Call {
+  id             String            @id @default(uuid())
+  campaignId     String
+  campaign       Campaign          @relation(fields: [campaignId], references: [id])
+  recipientId    String
+  recipient      CampaignRecipient @relation(fields: [recipientId], references: [id])
+  providerCallId String?           // Infobip's call ID
+  status         String            @default("initiated") // initiated, ringing, answered, completed, failed, no_answer
+  startedAt      DateTime?
+  endedAt        DateTime?
+  duration       Int?              // seconds
+  metadata       Json              @default("{}")
+  createdAt      DateTime          @default(now())
+  responses      Response[]
+}
+
+model Response {
+  id        String   @id @default(uuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id])
+  stepId    String   // references VoiceFlow step id
+  input     String   // DTMF digit pressed
+  value     String?  // mapped value (e.g. "yes", "no")
+  createdAt DateTime @default(now())
+}
