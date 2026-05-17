@@ -64,9 +64,10 @@ install_system_deps() {
 
   case "$DISTRO" in
     amzn|al2023)
-      dnf update -y -q
-      # curl-minimal ya viene preinstalado en AL2023 y es suficiente — no instalar curl completo
-      dnf install -y git nginx
+      # git no depende de curl, se instala limpio
+      dnf install -y git
+      # nginx puede jalar curl como dep; --allowerasing reemplaza curl-minimal si es necesario
+      dnf install -y --allowerasing nginx
       ;;
     ubuntu|debian)
       apt-get update -qq
