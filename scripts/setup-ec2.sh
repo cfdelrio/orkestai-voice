@@ -65,8 +65,8 @@ install_system_deps() {
   case "$DISTRO" in
     amzn|al2023)
       dnf update -y -q
-      # --allowerasing reemplaza curl-minimal por curl completo sin conflicto
-      dnf install -y --allowerasing git curl nginx
+      # curl-minimal ya viene preinstalado en AL2023 y es suficiente — no instalar curl completo
+      dnf install -y git nginx
       ;;
     ubuntu|debian)
       apt-get update -qq
