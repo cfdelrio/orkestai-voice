@@ -1,4 +1,4 @@
-import { listContacts } from '@/lib/api';
+import { listContacts, type Contact } from '@/lib/api';
 import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import ContactsClient from './ContactsClient';
@@ -9,7 +9,7 @@ export default async function ContactsPage() {
   const { getToken } = await auth();
   const token = (await getToken()) ?? '';
 
-  let contacts = [];
+  let contacts: Contact[] = [];
   try {
     const data = await listContacts(tenantId, token);
     contacts = data.contacts;
