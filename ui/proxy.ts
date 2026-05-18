@@ -45,14 +45,16 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   const host = req.headers.get('host') ?? '';
+  const hostname = host.split(':')[0];
   const requestHeaders = new Headers(req.headers);
 
   const tenant = await resolveTenantSlug(host);
   if (tenant) {
     requestHeaders.set('x-tenant-id', tenant.id);
     requestHeaders.set('x-tenant-slug', tenant.slug);
-  } else {
-    // Dominio base sin subdominio: redirigir al subdominio del tenant del usuario
+  } else if (hostname === BASE_DOMAIN) {
+    // Solo redirigir desde el dominio base — nunca desde un subdominio
+    // (evita loops si el backend está momentáneamente caído)
     const { userId, getToken } = await auth();
     if (userId) {
       const token = await getToken();
