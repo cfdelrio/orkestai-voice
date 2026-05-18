@@ -34,27 +34,9 @@ export interface FlowStep {
   timeout?: number;
 }
 
-export type VoiceOption =
-  | 'Polly.Mia-Neural'
-  | 'Polly.Lupe-Neural'
-  | 'Polly.Andres-Neural'
-  | 'Polly.Miguel-Neural'
-  | 'es-MX'
-  | 'es-ES';
-
-export const VOICE_OPTIONS: { value: VoiceOption; label: string; description: string }[] = [
-  { value: 'Polly.Mia-Neural',    label: 'Mía Neural (mujer, Latam)',   description: 'Amazon Polly · español México · neural' },
-  { value: 'Polly.Lupe-Neural',   label: 'Lupe Neural (mujer, Latam)',  description: 'Amazon Polly · español EEUU · neural' },
-  { value: 'Polly.Andres-Neural', label: 'Andrés Neural (hombre, Latam)', description: 'Amazon Polly · español México · neural' },
-  { value: 'Polly.Miguel-Neural', label: 'Miguel Neural (hombre, Latam)', description: 'Amazon Polly · español EEUU · neural' },
-  { value: 'es-MX',              label: 'Básica Latam (mujer)',         description: 'Twilio integrado · sin costo adicional' },
-  { value: 'es-ES',              label: 'Básica España (mujer)',        description: 'Twilio integrado · acento español' },
-];
-
 export interface VoiceFlow {
   id: string;
   campaignId: string;
-  voice: VoiceOption;
   steps: FlowStep[];
   createdAt: string;
   updatedAt: string;
@@ -121,7 +103,7 @@ export const listContacts = (tenantId: string, token?: string) =>
 
 export const createCampaign = (
   tenantId: string,
-  data: { name: string; description?: string; variables?: Record<string, string> },
+  data: { name: string; description?: string; variables?: Record<string, string>; voiceInstructions?: string },
   token?: string,
 ) =>
   apiFetch<{ campaign: Campaign }>(`/api/tenants/${tenantId}/campaigns`, {
@@ -129,10 +111,10 @@ export const createCampaign = (
     body: JSON.stringify(data),
   }, token);
 
-export const setFlow = (campaignId: string, steps: FlowStep[], token?: string, voice?: VoiceOption) =>
+export const setFlow = (campaignId: string, steps: FlowStep[], token?: string) =>
   apiFetch<{ flow: VoiceFlow }>(`/api/campaigns/${campaignId}/flow`, {
     method: 'POST',
-    body: JSON.stringify({ steps, voice }),
+    body: JSON.stringify({ steps }),
   }, token);
 
 export const addRecipients = (campaignId: string, contactIds: string[], token?: string) =>

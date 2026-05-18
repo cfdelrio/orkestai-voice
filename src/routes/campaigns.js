@@ -27,7 +27,7 @@ const tenantRouter = Router({ mergeParams: true });
  */
 tenantRouter.post('/', asyncHandler(async (req, res) => {
   const { tenantId } = req.params;
-  const { name, description, variables, metadata } = req.body;
+  const { name, description, variables, voiceInstructions, metadata } = req.body;
 
   if (!name || typeof name !== 'string') {
     throw badRequest('"name" is required');
@@ -37,6 +37,7 @@ tenantRouter.post('/', asyncHandler(async (req, res) => {
     name,
     description: description || null,
     variables: variables && typeof variables === 'object' ? variables : {},
+    voiceInstructions: typeof voiceInstructions === 'string' ? voiceInstructions : undefined,
     metadata: metadata || {},
   });
 

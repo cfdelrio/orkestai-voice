@@ -16,8 +16,11 @@ const { createLogger } = require('../middleware/logger');
 const logger = createLogger('AudioService');
 
 const AUDIO_DIR = path.join(process.cwd(), 'audio');
-const MODEL = 'tts-1-hd';
 const VOICE = 'nova';
+// gpt-4o-mini-tts supports the `instructions` param for style/accent control
+const MODEL_WITH_INSTRUCTIONS = 'gpt-4o-mini-tts';
+// tts-1-hd is the fallback when no instructions are provided
+const MODEL_DEFAULT = 'tts-1-hd';
 
 function getFilename(recipientId, stepId) {
   return `${recipientId}-${stepId}.mp3`;
@@ -41,9 +44,10 @@ function getAudioUrl(recipientId, stepId, webhookBase) {
  *
  * @param {string} recipientId
  * @param {string} stepId
- * @param {string} text - Already interpolated plain text (no template variables)
+ * @param {string} text         - Already interpolated plain text
+ * @param {string} [instructions] - Voice style instructions (accent, tone, pace)
  */
-async function generateAudio(recipientId, stepId, text) {
+async function generateAudio(recipientId, stepId, text, instructions) {
   const filepath = getFilepath(recipientId, stepId);
 
   if (fs.existsSync(filepath)) {
@@ -60,14 +64,18 @@ async function generateAudio(recipientId, stepId, text) {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  logger.info('Generating audio', { recipientId, stepId, chars: text.length });
+  const model = instructions ? MODEL_WITH_INSTRUCTIONS : MODEL_DEFAULT;
+  logger.info('Generating audio', { recipientId, stepId, chars: text.length, model, hasInstructions: !!instructions });
 
-  const response = await openai.audio.speech.create({
-    model: MODEL,
+  const params = {
+    model,
     voice: VOICE,
     input: text,
     response_format: 'mp3',
-  });
+  };
+  if (instructions) params.instructions = instructions;
+
+  const response = await openai.audio.speech.create(params);
 
   const buffer = Buffer.from(await response.arrayBuffer());
   fs.writeFileSync(filepath, buffer);
@@ -77,20 +85,19 @@ async function generateAudio(recipientId, stepId, text) {
 
 /**
  * Generates audio for all steps of a recipient's campaign flow.
- * Steps with the same interpolated text share the same cache slot automatically
- * because the file is keyed by recipientId+stepId (per-recipient).
  *
  * @param {string} recipientId
  * @param {Array<{id: string, text: string, type: string}>} steps
- * @param {Record<string, string>} vars - Template variables for this contact
+ * @param {Record<string, string>} vars         - Template variables for this contact
+ * @param {string}                [instructions] - Voice style instructions
  */
-async function generateAudioForRecipient(recipientId, steps, vars) {
+async function generateAudioForRecipient(recipientId, steps, vars, instructions) {
   const { interpolateTemplate } = require('./templateEngine');
 
   const results = await Promise.allSettled(
     steps.map((step) => {
       const text = interpolateTemplate(step.text || '', vars);
-      return generateAudio(recipientId, step.id, text);
+      return generateAudio(recipientId, step.id, text, instructions);
     })
   );
 

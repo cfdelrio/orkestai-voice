@@ -9,10 +9,8 @@ import {
   addRecipients,
   startCampaign,
   listContacts,
-  VOICE_OPTIONS,
   type FlowStep,
   type Contact,
-  type VoiceOption,
 } from '@/lib/api';
 import { useTenant } from '@/app/providers';
 import Link from 'next/link';
@@ -48,9 +46,11 @@ export default function NewCampaignPage() {
   const [variables, setVariables] = useState<{ key: string; value: string }[]>([
     { key: 'brandName', value: '' },
   ]);
+  const [voiceInstructions, setVoiceInstructions] = useState(
+    'Hablá con acento rioplatense, tono cálido y profesional. Ritmo natural, sin apuro. Cuando saludes usá "Hola" y tuteo.'
+  );
 
   // Step 2
-  const [voice, setVoice] = useState<VoiceOption>('Polly.Mia-Neural');
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([
     { id: 'intro', type: 'say', text: 'Hola {{firstName}}, te llama {{brandName}}.' },
     { id: 'q1', type: 'dtmf_question', text: 'Presioná 1 para Sí, 2 para No.', maxDigits: 1, timeout: 8, options: { '1': 'yes', '2': 'no' } },
@@ -91,6 +91,7 @@ export default function NewCampaignPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         variables: buildVariablesMap(),
+        voiceInstructions: voiceInstructions.trim() || undefined,
       }, token);
       setCampaignId(res.campaign.id);
       setStep('flow');
@@ -105,7 +106,7 @@ export default function NewCampaignPage() {
     setLoading(true); setError(null);
     try {
       const token = (await getToken()) ?? undefined;
-      await setFlow(campaignId, flowSteps, token, voice);
+      await setFlow(campaignId, flowSteps, token);
       if (!contactsLoaded) {
         const res = await listContacts(tenantId, token);
         setContacts(res.contacts);
@@ -222,6 +223,24 @@ export default function NewCampaignPage() {
               />
             </div>
 
+            {/* Voice instructions */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Instrucciones de voz
+                <span className="text-slate-400 font-normal ml-1">(cómo debe hablar el asistente)</span>
+              </label>
+              <textarea
+                value={voiceInstructions}
+                onChange={(e) => setVoiceInstructions(e.target.value)}
+                rows={3}
+                placeholder="Ej: Hablá con acento rioplatense, tono cálido y profesional..."
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Podés pedir acento, tono, velocidad, estilo. Estas instrucciones se pasan directamente al motor de voz IA.
+              </p>
+            </div>
+
             {/* Campaign variables */}
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -286,41 +305,6 @@ export default function NewCampaignPage() {
       {step === 'flow' && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="font-semibold text-slate-800 mb-5">Flujo de voz</h2>
-
-          {/* Voice selector */}
-          <div className="mb-5 p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Voz del asistente
-            </label>
-            <div className="grid grid-cols-1 gap-2">
-              {VOICE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
-                    voice === opt.value
-                      ? 'border-indigo-400 bg-indigo-50'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="voice"
-                    value={opt.value}
-                    checked={voice === opt.value}
-                    onChange={() => setVoice(opt.value)}
-                    className="accent-indigo-600"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800">{opt.label}</p>
-                    <p className="text-xs text-slate-500">{opt.description}</p>
-                  </div>
-                  {opt.value.startsWith('Polly.') && (
-                    <span className="text-xs font-medium text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded shrink-0">Neural</span>
-                  )}
-                </label>
-              ))}
-            </div>
-          </div>
 
           {/* Available variables reference */}
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">

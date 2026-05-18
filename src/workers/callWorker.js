@@ -53,8 +53,11 @@ async function processCallJob(job) {
       lastName:  recipient.contact.lastName  || '',
       phone:     recipient.contact.phone     || '',
     };
+    const voiceInstructions = campaign.tenant?.metadata?.voiceInstructions
+      || campaign.metadata?.voiceInstructions
+      || undefined;
     try {
-      await generateAudioForRecipient(recipientId, campaign.flow.steps, vars);
+      await generateAudioForRecipient(recipientId, campaign.flow.steps, vars, voiceInstructions);
     } catch (audioErr) {
       // Non-fatal: fall back to <Say> in TwiML if audio generation fails
       logger.warn('Audio pre-generation failed — will use Say fallback', {

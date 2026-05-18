@@ -27,7 +27,7 @@ const VALID_STEP_TYPES = ['say', 'dtmf_question', 'goodbye'];
  * @param {Object} [data.metadata]
  * @returns {Promise<Object>} Created campaign record
  */
-async function createCampaign(tenantId, { name, description, variables = {}, metadata = {} }) {
+async function createCampaign(tenantId, { name, description, variables = {}, voiceInstructions, metadata = {} }) {
   await getTenantById(tenantId);
 
   if (!name || !name.trim()) {
@@ -36,6 +36,10 @@ async function createCampaign(tenantId, { name, description, variables = {}, met
 
   logger.info(`Creating campaign`, { tenantId, name });
 
+  const resolvedMetadata = voiceInstructions
+    ? { ...metadata, voiceInstructions: voiceInstructions.trim() }
+    : metadata;
+
   const campaign = await prisma.campaign.create({
     data: {
       tenantId,
@@ -43,7 +47,7 @@ async function createCampaign(tenantId, { name, description, variables = {}, met
       description: description?.trim() || null,
       status: 'draft',
       variables,
-      metadata,
+      metadata: resolvedMetadata,
     },
   });
 
