@@ -14,6 +14,7 @@ const PUBLIC_PREFIXES = [
 const TOKEN_ONLY_PATHS = [
   '/users/link',
   '/tenants/slug/',
+  '/onboarding',
 ];
 
 function isPublic(path) {

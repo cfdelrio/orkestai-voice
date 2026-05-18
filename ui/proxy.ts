@@ -45,22 +45,31 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   const host = req.headers.get('host') ?? '';
+  const hostname = host.split(':')[0];
   const requestHeaders = new Headers(req.headers);
 
   const tenant = await resolveTenantSlug(host);
   if (tenant) {
     requestHeaders.set('x-tenant-id', tenant.id);
     requestHeaders.set('x-tenant-slug', tenant.slug);
-  } else {
-    // Dominio base sin subdominio: redirigir al subdominio del tenant del usuario
+  } else if (hostname === BASE_DOMAIN) {
+    // Solo redirigir desde el dominio base — nunca desde un subdominio
+    // (evita loops si el backend está momentáneamente caído)
     const { userId, getToken } = await auth();
     if (userId) {
       const token = await getToken();
       if (token) {
         const slug = await getUserTenantSlug(token);
         if (slug) {
+          // Tiene tenant → redirigir al subdominio
           const url = req.nextUrl.clone();
           url.host = `${slug}.${BASE_DOMAIN}`;
+          url.port = '';
+          return NextResponse.redirect(url);
+        } else if (!req.nextUrl.pathname.startsWith('/onboarding')) {
+          // Sin tenant → onboarding
+          const url = req.nextUrl.clone();
+          url.pathname = '/onboarding';
           return NextResponse.redirect(url);
         }
       }
@@ -68,7 +77,7 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } });
-});
+}, { debug: false });
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
