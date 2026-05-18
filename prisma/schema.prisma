@@ -68,6 +68,7 @@ model VoiceFlow {
   id         String   @id @default(uuid())
   campaignId String   @unique
   campaign   Campaign @relation(fields: [campaignId], references: [id])
+  voice      String   @default("Polly.Mia-Neural") // Polly.Mia-Neural | Polly.Lupe-Neural | Polly.Andres-Neural | es-MX | es-ES
   steps      Json     // array of steps: say, dtmf_question, goodbye
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

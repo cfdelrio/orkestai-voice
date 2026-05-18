@@ -73,13 +73,13 @@ campaignRouter.get('/:campaignId', asyncHandler(async (req, res) => {
  */
 campaignRouter.post('/:campaignId/flow', asyncHandler(async (req, res) => {
   const { campaignId } = req.params;
-  const { steps } = req.body;
+  const { steps, voice } = req.body;
 
   if (!steps) {
     throw badRequest('"steps" array is required');
   }
 
-  const flow = await campaignService.setFlow(campaignId, { steps });
+  const flow = await campaignService.setFlow(campaignId, { steps, voice });
   res.status(201).json({ flow });
 }));
 

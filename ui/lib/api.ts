@@ -34,9 +34,27 @@ export interface FlowStep {
   timeout?: number;
 }
 
+export type VoiceOption =
+  | 'Polly.Mia-Neural'
+  | 'Polly.Lupe-Neural'
+  | 'Polly.Andres-Neural'
+  | 'Polly.Miguel-Neural'
+  | 'es-MX'
+  | 'es-ES';
+
+export const VOICE_OPTIONS: { value: VoiceOption; label: string; description: string }[] = [
+  { value: 'Polly.Mia-Neural',    label: 'Mía Neural (mujer, Latam)',   description: 'Amazon Polly · español México · neural' },
+  { value: 'Polly.Lupe-Neural',   label: 'Lupe Neural (mujer, Latam)',  description: 'Amazon Polly · español EEUU · neural' },
+  { value: 'Polly.Andres-Neural', label: 'Andrés Neural (hombre, Latam)', description: 'Amazon Polly · español México · neural' },
+  { value: 'Polly.Miguel-Neural', label: 'Miguel Neural (hombre, Latam)', description: 'Amazon Polly · español EEUU · neural' },
+  { value: 'es-MX',              label: 'Básica Latam (mujer)',         description: 'Twilio integrado · sin costo adicional' },
+  { value: 'es-ES',              label: 'Básica España (mujer)',        description: 'Twilio integrado · acento español' },
+];
+
 export interface VoiceFlow {
   id: string;
   campaignId: string;
+  voice: VoiceOption;
   steps: FlowStep[];
   createdAt: string;
   updatedAt: string;
@@ -91,10 +109,10 @@ export const createCampaign = (tenantId: string, data: { name: string; descripti
     body: JSON.stringify(data),
   }, token);
 
-export const setFlow = (campaignId: string, steps: FlowStep[], token?: string) =>
+export const setFlow = (campaignId: string, steps: FlowStep[], token?: string, voice?: VoiceOption) =>
   apiFetch<{ flow: VoiceFlow }>(`/api/campaigns/${campaignId}/flow`, {
     method: 'POST',
-    body: JSON.stringify({ steps }),
+    body: JSON.stringify({ steps, voice }),
   }, token);
 
 export const addRecipients = (campaignId: string, contactIds: string[], token?: string) =>

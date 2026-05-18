@@ -9,8 +9,10 @@ import {
   addRecipients,
   startCampaign,
   listContacts,
+  VOICE_OPTIONS,
   type FlowStep,
   type Contact,
+  type VoiceOption,
 } from '@/lib/api';
 import { useTenant } from '@/app/providers';
 import Link from 'next/link';
@@ -45,6 +47,7 @@ export default function NewCampaignPage() {
   const [campaignId, setCampaignId] = useState<string | null>(null);
 
   // Step 2
+  const [voice, setVoice] = useState<VoiceOption>('Polly.Mia-Neural');
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([
     { id: 'intro', type: 'say', text: 'Hola {{firstName}}, te llama {{brandName}}.' },
     { id: 'q1', type: 'dtmf_question', text: 'Presioná 1 para Sí, 2 para No.', maxDigits: 1, timeout: 8, options: { '1': 'yes', '2': 'no' } },
@@ -77,7 +80,7 @@ export default function NewCampaignPage() {
     setLoading(true); setError(null);
     try {
       const token = (await getToken()) ?? undefined;
-      await setFlow(campaignId, flowSteps, token);
+      await setFlow(campaignId, flowSteps, token, voice);
       if (!contactsLoaded) {
         const res = await listContacts(tenantId, token);
         setContacts(res.contacts);
@@ -209,7 +212,44 @@ export default function NewCampaignPage() {
       {/* Step 2: Flow */}
       {step === 'flow' && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="font-semibold text-slate-800 mb-5">Pasos del flujo de voz</h2>
+          <h2 className="font-semibold text-slate-800 mb-5">Flujo de voz</h2>
+
+          {/* Voice selector */}
+          <div className="mb-5 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Voz del asistente
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+              {VOICE_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    voice === opt.value
+                      ? 'border-indigo-400 bg-indigo-50'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="voice"
+                    value={opt.value}
+                    checked={voice === opt.value}
+                    onChange={() => setVoice(opt.value)}
+                    className="accent-indigo-600"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800">{opt.label}</p>
+                    <p className="text-xs text-slate-500">{opt.description}</p>
+                  </div>
+                  {opt.value.startsWith('Polly.') && (
+                    <span className="text-xs font-medium text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded shrink-0">Neural</span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-sm font-medium text-slate-700 mb-3">Pasos del flujo</p>
           <div className="space-y-3">
             {flowSteps.map((s, i) => (
               <div key={s.id} className="border border-slate-200 rounded-lg p-4">
