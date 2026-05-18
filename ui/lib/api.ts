@@ -69,6 +69,7 @@ export interface Campaign {
   scheduledAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  variables: Record<string, string>;
   metadata: Record<string, unknown>;
   flow?: VoiceFlow | null;
   createdAt: string;
@@ -103,7 +104,11 @@ export const getCampaignResults = (campaignId: string, token?: string) =>
 export const listContacts = (tenantId: string, token?: string) =>
   apiFetch<{ contacts: Contact[]; count: number }>(`/api/tenants/${tenantId}/contacts`, undefined, token);
 
-export const createCampaign = (tenantId: string, data: { name: string; description?: string }, token?: string) =>
+export const createCampaign = (
+  tenantId: string,
+  data: { name: string; description?: string; variables?: Record<string, string> },
+  token?: string,
+) =>
   apiFetch<{ campaign: Campaign }>(`/api/tenants/${tenantId}/campaigns`, {
     method: 'POST',
     body: JSON.stringify(data),

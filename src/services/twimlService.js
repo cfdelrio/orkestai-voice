@@ -164,12 +164,14 @@ async function getTwimlForRecipient(recipientId, webhookBase) {
     return hangupTwiml();
   }
 
-  const tenantMetadata = campaign.tenant?.metadata || {};
+  const campaignVars = campaign.variables && typeof campaign.variables === 'object' ? campaign.variables : {};
   const vars = {
+    // Campaign-level variables (defined when creating the campaign)
+    ...campaignVars,
+    // Contact fields always override — they come from the actual contact record
     firstName: contact.firstName || '',
     lastName:  contact.lastName  || '',
     phone:     contact.phone     || '',
-    brandName: tenantMetadata.brandName || '',
   };
 
   const verbs = buildTwimlVerbs(flow.steps, vars, webhookBase, recipientId, flow.voice);
@@ -283,12 +285,12 @@ async function getTwimlAfterGather(recipientId, stepId, digit, webhookBase) {
     return wrapResponse('<Hangup/>');
   }
 
-  const tenantMetadata = campaign.tenant?.metadata || {};
+  const campaignVars = campaign.variables && typeof campaign.variables === 'object' ? campaign.variables : {};
   const vars = {
+    ...campaignVars,
     firstName: contact.firstName || '',
     lastName:  contact.lastName  || '',
     phone:     contact.phone     || '',
-    brandName: tenantMetadata.brandName || '',
   };
 
   const verbs = buildTwimlVerbs(remainingSteps, vars, webhookBase, recipientId, flow.voice);

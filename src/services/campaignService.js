@@ -27,7 +27,7 @@ const VALID_STEP_TYPES = ['say', 'dtmf_question', 'goodbye'];
  * @param {Object} [data.metadata]
  * @returns {Promise<Object>} Created campaign record
  */
-async function createCampaign(tenantId, { name, description, metadata = {} }) {
+async function createCampaign(tenantId, { name, description, variables = {}, metadata = {} }) {
   await getTenantById(tenantId);
 
   if (!name || !name.trim()) {
@@ -42,6 +42,7 @@ async function createCampaign(tenantId, { name, description, metadata = {} }) {
       name: name.trim(),
       description: description?.trim() || null,
       status: 'draft',
+      variables,
       metadata,
     },
   });

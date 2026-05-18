@@ -45,6 +45,9 @@ export default function NewCampaignPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [variables, setVariables] = useState<{ key: string; value: string }[]>([
+    { key: 'brandName', value: '' },
+  ]);
 
   // Step 2
   const [voice, setVoice] = useState<VoiceOption>('Polly.Mia-Neural');
@@ -61,12 +64,34 @@ export default function NewCampaignPage() {
 
   // ─── Step handlers ──────────────────────────────────────────────────────────
 
+  function updateVariable(index: number, field: 'key' | 'value', val: string) {
+    setVariables((prev) => prev.map((v, i) => i === index ? { ...v, [field]: val } : v));
+  }
+
+  function addVariable() {
+    setVariables((prev) => [...prev, { key: '', value: '' }]);
+  }
+
+  function removeVariable(index: number) {
+    setVariables((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function buildVariablesMap(): Record<string, string> {
+    return Object.fromEntries(
+      variables.filter((v) => v.key.trim()).map((v) => [v.key.trim(), v.value])
+    );
+  }
+
   async function handleCreateCampaign() {
     if (!name.trim()) { setError('El nombre es requerido'); return; }
     setLoading(true); setError(null);
     try {
       const token = (await getToken()) ?? undefined;
-      const res = await createCampaign(tenantId, { name: name.trim(), description: description.trim() || undefined }, token);
+      const res = await createCampaign(tenantId, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        variables: buildVariablesMap(),
+      }, token);
       setCampaignId(res.campaign.id);
       setStep('flow');
     } catch (e) { setError((e as Error).message); }
@@ -196,6 +221,54 @@ export default function NewCampaignPage() {
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
               />
             </div>
+
+            {/* Campaign variables */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">Variables de la campaña</label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Usá <code className="bg-slate-100 px-1 rounded">{'{{nombre}}'}</code> en los textos del flujo para insertar estos valores.
+                    Los datos del contacto (<code className="bg-slate-100 px-1 rounded">{'{{firstName}}'}</code>, <code className="bg-slate-100 px-1 rounded">{'{{lastName}}'}</code>, <code className="bg-slate-100 px-1 rounded">{'{{phone}}'}</code>) siempre están disponibles.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {variables.map((v, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={v.key}
+                      onChange={(e) => updateVariable(i, 'key', e.target.value)}
+                      placeholder="nombre de variable"
+                      className="w-36 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                    <span className="text-slate-400 text-sm shrink-0">=</span>
+                    <input
+                      type="text"
+                      value={v.value}
+                      onChange={(e) => updateVariable(i, 'value', e.target.value)}
+                      placeholder="valor"
+                      className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeVariable(i)}
+                      className="text-slate-400 hover:text-red-500 transition-colors shrink-0 p-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addVariable}
+                  className="w-full border border-dashed border-slate-300 text-slate-500 text-xs rounded-lg py-1.5 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                >
+                  + Agregar variable
+                </button>
+              </div>
+            </div>
           </div>
           <div className="mt-6 flex justify-end">
             <button
@@ -246,6 +319,28 @@ export default function NewCampaignPage() {
                   )}
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* Available variables reference */}
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs font-medium text-amber-800 mb-1.5">Variables disponibles en los textos</p>
+            <div className="flex flex-wrap gap-1.5">
+              {['firstName', 'lastName', 'phone'].map((v) => (
+                <span key={v} className="inline-flex items-center gap-1 bg-white border border-amber-200 text-amber-700 text-xs font-mono px-2 py-0.5 rounded">
+                  {`{{${v}}}`}
+                  <span className="text-amber-400 font-sans">contacto</span>
+                </span>
+              ))}
+              {variables.filter((v) => v.key.trim()).map((v) => (
+                <span key={v.key} className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-700 text-xs font-mono px-2 py-0.5 rounded">
+                  {`{{${v.key}}}`}
+                  {v.value && <span className="text-indigo-400 font-sans truncate max-w-[80px]">{v.value}</span>}
+                </span>
+              ))}
+              {variables.filter((v) => v.key.trim()).length === 0 && (
+                <span className="text-xs text-amber-600 italic">No hay variables de campaña definidas</span>
+              )}
             </div>
           </div>
 

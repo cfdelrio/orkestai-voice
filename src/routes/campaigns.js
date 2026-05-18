@@ -27,7 +27,7 @@ const tenantRouter = Router({ mergeParams: true });
  */
 tenantRouter.post('/', asyncHandler(async (req, res) => {
   const { tenantId } = req.params;
-  const { name, description, metadata } = req.body;
+  const { name, description, variables, metadata } = req.body;
 
   if (!name || typeof name !== 'string') {
     throw badRequest('"name" is required');
@@ -36,6 +36,7 @@ tenantRouter.post('/', asyncHandler(async (req, res) => {
   const campaign = await campaignService.createCampaign(tenantId, {
     name,
     description: description || null,
+    variables: variables && typeof variables === 'object' ? variables : {},
     metadata: metadata || {},
   });
 
