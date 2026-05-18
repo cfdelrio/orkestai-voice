@@ -84,9 +84,24 @@ export interface Contact {
   email: string | null;
 }
 
+export interface CampaignRecipient {
+  id: string;
+  status: string;
+  contact: { id: string; firstName: string; lastName: string | null; phone: string };
+  lastCall: {
+    id: string;
+    status: string;
+    startedAt: string | null;
+    endedAt: string | null;
+    duration: number | null;
+    responses: { stepId: string; input: string; value: string | null }[];
+  } | null;
+}
+
 export interface CampaignResults {
   campaign: Campaign;
   flow: VoiceFlow | null;
+  recipients: CampaignRecipient[];
   stats: {
     totalRecipients: number;
     recipientsByStatus: Record<string, number>;

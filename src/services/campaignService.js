@@ -292,10 +292,35 @@ async function getCampaignResults(campaignId) {
       name: campaign.name,
       description: campaign.description,
       status: campaign.status,
+      scheduledAt: campaign.scheduledAt,
+      startedAt: campaign.startedAt,
+      completedAt: campaign.completedAt,
+      variables: campaign.variables,
       createdAt: campaign.createdAt,
       updatedAt: campaign.updatedAt,
     },
     flow: campaign.flow,
+    recipients: campaign.recipients.map((r) => {
+      const lastCall = r.calls[0] ?? null;
+      return {
+        id: r.id,
+        status: r.status,
+        contact: {
+          id: r.contact.id,
+          firstName: r.contact.firstName,
+          lastName: r.contact.lastName,
+          phone: r.contact.phone,
+        },
+        lastCall: lastCall ? {
+          id: lastCall.id,
+          status: lastCall.status,
+          startedAt: lastCall.startedAt,
+          endedAt: lastCall.endedAt,
+          duration: lastCall.duration,
+          responses: lastCall.responses,
+        } : null,
+      };
+    }),
     stats: {
       totalRecipients,
       recipientsByStatus: {

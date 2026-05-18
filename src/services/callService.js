@@ -39,10 +39,10 @@ async function startCampaign(campaignId) {
   const campaign = await getCampaignById(campaignId);
 
   // Validate campaign can be started
-  if (!['draft', 'paused'].includes(campaign.status)) {
+  if (!['draft', 'paused', 'completed'].includes(campaign.status)) {
     throw badRequest(
       `Campaign "${campaign.name}" is in status "${campaign.status}" and cannot be started. ` +
-      'Only "draft" or "paused" campaigns can be started.'
+      'Only "draft", "paused", or "completed" campaigns can be started.'
     );
   }
 
