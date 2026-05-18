@@ -106,7 +106,21 @@ export default function NewCampaignPage() {
   // ─── Flow step editors ──────────────────────────────────────────────────────
 
   function updateFlowStep(index: number, update: Partial<FlowStep>) {
-    setFlowSteps((prev) => prev.map((s, i) => i === index ? { ...s, ...update } : s));
+    setFlowSteps((prev) => prev.map((s, i) => {
+      if (i !== index) return s;
+      const updated = { ...s, ...update };
+      if (update.type === 'dtmf_question' && !updated.options) {
+        updated.options = { '1': 'yes', '2': 'no' };
+        updated.maxDigits = updated.maxDigits ?? 1;
+        updated.timeout = updated.timeout ?? 8;
+      }
+      if (update.type && update.type !== 'dtmf_question') {
+        delete updated.options;
+        delete updated.maxDigits;
+        delete updated.timeout;
+      }
+      return updated;
+    }));
   }
 
   function addFlowStep() {
