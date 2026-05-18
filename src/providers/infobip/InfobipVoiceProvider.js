@@ -74,7 +74,7 @@ class InfobipVoiceProvider extends VoiceProvider {
       from,
       to:                  toNumber,
       text:                fullText,
-      language:            'es-ES',
+      language:            'es',
       voice:               { name: 'es-ES-Standard-A', gender: 'female' },
       notifyUrl:           webhookUrl,
       notifyContentType:   'application/json',
@@ -178,7 +178,7 @@ class InfobipVoiceProvider extends VoiceProvider {
           type: 'SAY',
           say: {
             text,
-            language: 'es-ES',
+            language: 'es',
             voice:    { name: 'es-ES-Standard-A', gender: 'female' },
           },
         });
@@ -188,7 +188,7 @@ class InfobipVoiceProvider extends VoiceProvider {
           collect: {
             say: {
               text,
-              language: 'es-ES',
+              language: 'es',
               voice:    { name: 'es-ES-Standard-A', gender: 'female' },
             },
             dtmf: {
@@ -202,7 +202,7 @@ class InfobipVoiceProvider extends VoiceProvider {
           type: 'SAY',
           say: {
             text,
-            language: 'es-ES',
+            language: 'es',
             voice:    { name: 'es-ES-Standard-A', gender: 'female' },
           },
         });
