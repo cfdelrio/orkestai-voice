@@ -9,11 +9,11 @@ const logger = createLogger('Auth');
 const PUBLIC_PREFIXES = [
   '/webhooks/',
   '/twiml/',
+  '/tenants/slug/',
 ];
 // Routes that verify the JWT but don't require a linked User record in DB
 const TOKEN_ONLY_PATHS = [
   '/users/link',
-  '/tenants/slug/',
   '/onboarding',
 ];
 
