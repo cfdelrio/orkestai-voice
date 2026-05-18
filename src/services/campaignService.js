@@ -379,6 +379,36 @@ async function resumeCampaign(campaignId) {
   return { campaignId, status: 'running', enqueued: jobs.length };
 }
 
+/**
+ * Deletes a campaign and all related data in the correct FK order.
+ * Refuses to delete campaigns that are currently running.
+ *
+ * @param {string} campaignId
+ */
+async function deleteCampaign(campaignId) {
+  const campaign = await getCampaignById(campaignId);
+
+  if (campaign.status === 'running') {
+    throw badRequest('No se puede borrar una campaña activa. Pausala primero.');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const calls = await tx.call.findMany({ where: { campaignId }, select: { id: true } });
+    const callIds = calls.map((c) => c.id);
+
+    if (callIds.length > 0) {
+      await tx.response.deleteMany({ where: { callId: { in: callIds } } });
+    }
+    await tx.call.deleteMany({ where: { campaignId } });
+    await tx.campaignRecipient.deleteMany({ where: { campaignId } });
+    await tx.voiceFlow.deleteMany({ where: { campaignId } });
+    await tx.campaign.delete({ where: { id: campaignId } });
+  });
+
+  logger.info('Campaign deleted', { campaignId });
+  return { deleted: true, campaignId };
+}
+
 module.exports = {
   createCampaign,
   listCampaigns,
@@ -389,4 +419,5 @@ module.exports = {
   getCampaignResults,
   pauseCampaign,
   resumeCampaign,
+  deleteCampaign,
 };

@@ -145,4 +145,14 @@ campaignRouter.patch('/:campaignId/resume', asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+/**
+ * DELETE /api/campaigns/:campaignId
+ * Deletes a campaign and all associated data (flow, recipients, calls, responses).
+ * Running campaigns cannot be deleted.
+ */
+campaignRouter.delete('/:campaignId', asyncHandler(async (req, res) => {
+  const result = await campaignService.deleteCampaign(req.params.campaignId);
+  res.json(result);
+}));
+
 module.exports = { tenantRouter, campaignRouter };

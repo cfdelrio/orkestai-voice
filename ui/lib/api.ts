@@ -118,6 +118,9 @@ export const linkUser = (tenantId: string, role: string | undefined, token: stri
     body: JSON.stringify({ tenantId, role }),
   }, token);
 
+export const deleteCampaign = (campaignId: string, token?: string) =>
+  apiFetch<{ deleted: boolean; campaignId: string }>(`/api/campaigns/${campaignId}`, { method: 'DELETE' }, token);
+
 export const createTenantOnboarding = (name: string, slug: string, token: string) =>
   apiFetch<{ tenant: { id: string; name: string; slug: string }; user: { id: string }; created: boolean }>('/api/onboarding', {
     method: 'POST',
