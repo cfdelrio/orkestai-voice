@@ -38,7 +38,7 @@ function CampaignCard({ campaign, token }: { campaign: Campaign; token: string }
           <span>{new Date(campaign.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
         </div>
       </Link>
-      <DeleteCampaignButton campaignId={campaign.id} token={token} status={campaign.status} />
+      <DeleteCampaignButton campaignId={campaign.id} token={token} status={campaign.status} campaignName={campaign.name} />
     </div>
   );
 }
