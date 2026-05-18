@@ -123,9 +123,29 @@ async function validateContactsForTenant(tenantId, contactIds) {
   return contacts;
 }
 
+/**
+ * Deletes a contact. Throws 400 if the contact is linked to any campaign.
+ *
+ * @param {string} tenantId
+ * @param {string} contactId
+ */
+async function deleteContact(tenantId, contactId) {
+  await getContactById(tenantId, contactId);
+
+  const recipientCount = await prisma.campaignRecipient.count({ where: { contactId } });
+  if (recipientCount > 0) {
+    throw badRequest(`El contacto está en ${recipientCount} campaña${recipientCount !== 1 ? 's' : ''} y no puede borrarse`);
+  }
+
+  await prisma.contact.delete({ where: { id: contactId } });
+  logger.info('Contact deleted', { contactId, tenantId });
+  return { deleted: true };
+}
+
 module.exports = {
   createContact,
   listContacts,
   getContactById,
   validateContactsForTenant,
+  deleteContact,
 };

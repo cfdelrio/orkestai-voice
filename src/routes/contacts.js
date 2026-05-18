@@ -60,4 +60,14 @@ router.get('/:contactId', asyncHandler(async (req, res) => {
   res.json({ contact });
 }));
 
+/**
+ * DELETE /api/tenants/:tenantId/contacts/:contactId
+ * Deletes a contact (only if not linked to any campaign).
+ */
+router.delete('/:contactId', asyncHandler(async (req, res) => {
+  const { tenantId, contactId } = req.params;
+  const result = await contactService.deleteContact(tenantId, contactId);
+  res.json(result);
+}));
+
 module.exports = router;

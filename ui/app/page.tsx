@@ -2,6 +2,7 @@ import { listCampaigns, linkUser, type Campaign } from '@/lib/api';
 import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import Link from 'next/link';
+import { DeleteCampaignButton } from '@/app/campaigns/DeleteCampaignButton';
 
 const STATUS_COLORS: Record<string, string> = {
   draft:     'bg-slate-100 text-slate-600',
@@ -13,32 +14,32 @@ const STATUS_COLORS: Record<string, string> = {
   failed:    'bg-red-100 text-red-700',
 };
 
-function CampaignCard({ campaign }: { campaign: Campaign }) {
+function CampaignCard({ campaign, token }: { campaign: Campaign; token: string }) {
   const color = STATUS_COLORS[campaign.status] ?? 'bg-slate-100 text-slate-600';
   const stepCount = campaign.flow?.steps?.length ?? 0;
 
   return (
-    <Link
-      href={`/campaigns/${campaign.id}`}
-      className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-sm transition-all"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-800 truncate">{campaign.name}</h3>
-          {campaign.description && (
-            <p className="text-sm text-slate-500 mt-0.5 truncate">{campaign.description}</p>
-          )}
+    <div className="relative bg-white rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-sm transition-all">
+      <Link href={`/campaigns/${campaign.id}`} className="block p-5">
+        <div className="flex items-start justify-between gap-3 pr-6">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-slate-800 truncate">{campaign.name}</h3>
+            {campaign.description && (
+              <p className="text-sm text-slate-500 mt-0.5 truncate">{campaign.description}</p>
+            )}
+          </div>
+          <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${color}`}>
+            {campaign.status}
+          </span>
         </div>
-        <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${color}`}>
-          {campaign.status}
-        </span>
-      </div>
-      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
-        <span>{stepCount} {stepCount === 1 ? 'paso' : 'pasos'}</span>
-        <span>·</span>
-        <span>{new Date(campaign.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-      </div>
-    </Link>
+        <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
+          <span>{stepCount} {stepCount === 1 ? 'paso' : 'pasos'}</span>
+          <span>·</span>
+          <span>{new Date(campaign.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+        </div>
+      </Link>
+      <DeleteCampaignButton campaignId={campaign.id} token={token} status={campaign.status} campaignName={campaign.name} />
+    </div>
   );
 }
 
@@ -93,7 +94,7 @@ export default async function CampaignsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {campaigns.map((c) => <CampaignCard key={c.id} campaign={c} />)}
+          {campaigns.map((c) => <CampaignCard key={c.id} campaign={c} token={token ?? ''} />)}
         </div>
       )}
     </div>

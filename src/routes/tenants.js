@@ -102,4 +102,55 @@ router.post('/:tenantId/provider-configs', asyncHandler(async (req, res) => {
   res.status(201).json({ providerConfig });
 }));
 
+/**
+ * GET /api/tenants/:tenantId/provider-configs
+ * Returns the provider config for a tenant (apiKey and authToken masked).
+ */
+router.get('/:tenantId/provider-configs', asyncHandler(async (req, res) => {
+  const { tenantId } = req.params;
+  const config = await tenantService.getProviderConfigForTenant(tenantId);
+  // Mask sensitive fields
+  const masked = {
+    ...config,
+    apiKey: config.apiKey ? config.apiKey.slice(0, 6) + '••••••••' : null,
+    metadata: config.metadata
+      ? { ...config.metadata, authToken: config.metadata.authToken ? '••••••••' : undefined }
+      : {},
+  };
+  res.json({ providerConfig: masked });
+}));
+
+/**
+ * PUT /api/tenants/:tenantId/provider-configs
+ * Updates (upserts) the provider config for a tenant.
+ */
+router.put('/:tenantId/provider-configs', asyncHandler(async (req, res) => {
+  const { tenantId } = req.params;
+  const { provider, apiKey, baseUrl, fromNumber, metadata } = req.body;
+
+  if (!provider) throw badRequest('"provider" is required');
+  if (!apiKey)   throw badRequest('"apiKey" is required');
+  if (!baseUrl)  throw badRequest('"baseUrl" is required');
+  if (!fromNumber) throw badRequest('"fromNumber" is required');
+
+  // If authToken is omitted (Twilio), preserve the existing one
+  let resolvedMetadata = metadata || {};
+  if (provider === 'twilio' && !resolvedMetadata.authToken) {
+    const existing = await tenantService.getProviderConfigForTenant(tenantId).catch(() => null);
+    if (existing?.metadata?.authToken) {
+      resolvedMetadata = { ...resolvedMetadata, authToken: existing.metadata.authToken };
+    }
+  }
+
+  const providerConfig = await tenantService.upsertProviderConfig(tenantId, {
+    provider: provider.trim().toLowerCase(),
+    apiKey: apiKey.trim(),
+    baseUrl: baseUrl.trim(),
+    fromNumber: fromNumber.trim(),
+    metadata: resolvedMetadata,
+  });
+
+  res.json({ providerConfig });
+}));
+
 module.exports = router;

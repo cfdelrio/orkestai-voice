@@ -1,9 +1,11 @@
 import { getCampaignResults, type CampaignResults } from '@/lib/api';
 import { auth } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CampaignActions } from './CampaignActions';
 import { CampaignCharts } from './CampaignCharts';
+import { AddRecipientsModal } from './AddRecipientsModal';
 
 const STATUS_COLORS: Record<string, string> = {
   draft:      'bg-slate-100 text-slate-600',
@@ -31,6 +33,9 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 
 export default async function CampaignResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  const headersList = await headers();
+  const tenantId = headersList.get('x-tenant-id') ?? process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID ?? '';
 
   const { getToken } = await auth();
   const token = (await getToken()) ?? undefined;
@@ -83,6 +88,7 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
           <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${STATUS_COLORS[campaign.status] ?? 'bg-slate-100 text-slate-600'}`}>
             {campaign.status}
           </span>
+          <AddRecipientsModal campaignId={campaign.id} tenantId={tenantId} />
           <CampaignActions campaignId={campaign.id} status={campaign.status} />
         </div>
       </div>

@@ -3,6 +3,8 @@ import './globals.css';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { ClerkProvider, Show, UserButton, SignInButton } from '@clerk/nextjs';
+
+export const dynamic = 'force-dynamic';
 import Providers from './providers';
 
 export const metadata: Metadata = {
@@ -28,8 +30,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 Campañas
               </Link>
+              <Link href="/contacts" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
+                Contactos
+              </Link>
               <Link href="/analytics" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 Analytics
+              </Link>
+              <Link href="/settings" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
+                Configuración
               </Link>
               <div className="ml-auto flex items-center gap-3">
                 {tenantSlug && (

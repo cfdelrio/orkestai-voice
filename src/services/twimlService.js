@@ -58,15 +58,32 @@ function hangupTwiml() {
 // ─── TwiML step builders ──────────────────────────────────────────────────────
 
 /**
+ * Builds a TwiML <Say> tag using the configured voice.
+ * Polly voices (e.g. "Polly.Mia-Neural") use the voice attribute.
+ * Language codes (e.g. "es-MX", "es-ES") use the language attribute.
+ *
+ * @param {string} text  - Already XML-escaped text
+ * @param {string} voice - Voice identifier from VoiceFlow.voice
+ * @returns {string}
+ */
+function buildSayTag(text, voice) {
+  if (voice && voice.startsWith('Polly.')) {
+    return `<Say voice="${voice}">${text}</Say>`;
+  }
+  return `<Say language="${voice || 'es-MX'}">${text}</Say>`;
+}
+
+/**
  * Builds TwiML XML verbs for an array of flow steps.
  *
  * @param {Array<Object>} steps        - Flow steps to render
  * @param {Object}        vars         - Template variables { firstName, brandName, ... }
  * @param {string}        webhookBase  - Base URL (scheme+host) for gather action URLs
  * @param {string}        recipientId  - CampaignRecipient UUID
+ * @param {string}        voice        - Voice identifier from VoiceFlow.voice
  * @returns {string} Raw TwiML verb string (no envelope)
  */
-function buildTwimlVerbs(steps, vars, webhookBase, recipientId) {
+function buildTwimlVerbs(steps, vars, webhookBase, recipientId, voice) {
   let xml = '';
   let hasGoodbye = false;
 
@@ -74,7 +91,7 @@ function buildTwimlVerbs(steps, vars, webhookBase, recipientId) {
     const text = escapeXml(interpolateTemplate(step.text || '', vars));
 
     if (step.type === 'say') {
-      xml += `<Say language="es-ES">${text}</Say>`;
+      xml += buildSayTag(text, voice);
 
     } else if (step.type === 'dtmf_question') {
       const numDigits = step.maxDigits || 1;
@@ -82,11 +99,11 @@ function buildTwimlVerbs(steps, vars, webhookBase, recipientId) {
       const action    = `${webhookBase}/api/twiml/recipients/${recipientId}/gather/${step.id}`;
 
       xml += `<Gather numDigits="${numDigits}" action="${action}" method="POST" timeout="${timeout}">`;
-      xml += `<Say language="es-ES">${text}</Say>`;
+      xml += buildSayTag(text, voice);
       xml += `</Gather>`;
 
     } else if (step.type === 'goodbye') {
-      xml += `<Say language="es-ES">${text}</Say>`;
+      xml += buildSayTag(text, voice);
       xml += `<Hangup/>`;
       hasGoodbye = true;
       break; // Nothing should come after a goodbye step
@@ -155,10 +172,10 @@ async function getTwimlForRecipient(recipientId, webhookBase) {
     brandName: tenantMetadata.brandName || '',
   };
 
-  const verbs = buildTwimlVerbs(flow.steps, vars, webhookBase, recipientId);
+  const verbs = buildTwimlVerbs(flow.steps, vars, webhookBase, recipientId, flow.voice);
   const twiml = wrapResponse(verbs);
 
-  logger.debug('Initial TwiML generated', { recipientId, twimlLength: twiml.length });
+  logger.debug('Initial TwiML generated', { recipientId, twimlLength: twiml.length, voice: flow.voice });
   return twiml;
 }
 
@@ -274,10 +291,10 @@ async function getTwimlAfterGather(recipientId, stepId, digit, webhookBase) {
     brandName: tenantMetadata.brandName || '',
   };
 
-  const verbs = buildTwimlVerbs(remainingSteps, vars, webhookBase, recipientId);
+  const verbs = buildTwimlVerbs(remainingSteps, vars, webhookBase, recipientId, flow.voice);
   const twiml = wrapResponse(verbs);
 
-  logger.debug('Post-gather TwiML generated', { recipientId, stepId, twimlLength: twiml.length });
+  logger.debug('Post-gather TwiML generated', { recipientId, stepId, twimlLength: twiml.length, voice: flow.voice });
   return twiml;
 }
 

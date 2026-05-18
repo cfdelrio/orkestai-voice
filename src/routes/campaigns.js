@@ -73,13 +73,13 @@ campaignRouter.get('/:campaignId', asyncHandler(async (req, res) => {
  */
 campaignRouter.post('/:campaignId/flow', asyncHandler(async (req, res) => {
   const { campaignId } = req.params;
-  const { steps } = req.body;
+  const { steps, voice } = req.body;
 
   if (!steps) {
     throw badRequest('"steps" array is required');
   }
 
-  const flow = await campaignService.setFlow(campaignId, { steps });
+  const flow = await campaignService.setFlow(campaignId, { steps, voice });
   res.status(201).json({ flow });
 }));
 
@@ -142,6 +142,16 @@ campaignRouter.patch('/:campaignId/pause', asyncHandler(async (req, res) => {
  */
 campaignRouter.patch('/:campaignId/resume', asyncHandler(async (req, res) => {
   const result = await campaignService.resumeCampaign(req.params.campaignId);
+  res.json(result);
+}));
+
+/**
+ * DELETE /api/campaigns/:campaignId
+ * Deletes a campaign and all associated data (flow, recipients, calls, responses).
+ * Running campaigns cannot be deleted.
+ */
+campaignRouter.delete('/:campaignId', asyncHandler(async (req, res) => {
+  const result = await campaignService.deleteCampaign(req.params.campaignId);
   res.json(result);
 }));
 
