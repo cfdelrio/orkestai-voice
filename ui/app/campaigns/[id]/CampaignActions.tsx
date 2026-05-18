@@ -43,11 +43,15 @@ function ConfirmModal({ title, description, confirmLabel, confirmClass, onConfir
   );
 }
 
-export function CampaignActions({ campaignId, status }: { campaignId: string; status: string }) {
+export function CampaignActions({ campaignId, status, pendingCount = 0 }: {
+  campaignId: string;
+  status: string;
+  pendingCount?: number;
+}) {
   const { getToken } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState<'start' | 'pause' | null>(null);
+  const [modal, setModal] = useState<'start' | 'pause' | 'retry' | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
 
@@ -66,6 +70,8 @@ export function CampaignActions({ campaignId, status }: { campaignId: string; st
     }
   }
 
+  const showRetry = pendingCount > 0 && ['completed', 'paused'].includes(status);
+
   return (
     <>
       <div className="flex items-center gap-3">
@@ -81,10 +87,16 @@ export function CampaignActions({ campaignId, status }: { campaignId: string; st
             ⏸ Pausar
           </button>
         )}
-        {status === 'paused' && (
+        {status === 'paused' && !showRetry && (
           <button onClick={() => run(async () => { const t = (await getToken()) ?? undefined; await resumeCampaign(campaignId, t); }, 'Campaña reanudada')} disabled={loading}
             className="text-sm font-medium px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
             {loading ? 'Reanudando…' : '▶ Reanudar'}
+          </button>
+        )}
+        {showRetry && (
+          <button onClick={() => setModal('retry')} disabled={loading}
+            className="text-sm font-medium px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            📞 Llamar pendientes ({pendingCount})
           </button>
         )}
       </div>
@@ -107,6 +119,17 @@ export function CampaignActions({ campaignId, status }: { campaignId: string; st
           confirmLabel="⏸ Pausar"
           confirmClass="bg-amber-500 text-white hover:bg-amber-600"
           onConfirm={() => run(async () => { const t = (await getToken()) ?? undefined; await pauseCampaign(campaignId, t); }, 'Campaña pausada')}
+          onCancel={() => !loading && setModal(null)}
+          loading={loading}
+        />
+      )}
+      {modal === 'retry' && (
+        <ConfirmModal
+          title={`Llamar ${pendingCount} pendiente${pendingCount !== 1 ? 's' : ''}`}
+          description={`Se iniciarán llamadas a los ${pendingCount} destinatario${pendingCount !== 1 ? 's' : ''} que todavía no fueron contactados.`}
+          confirmLabel="📞 Sí, llamar"
+          confirmClass="bg-indigo-600 text-white hover:bg-indigo-700"
+          onConfirm={() => run(async () => { const t = (await getToken()) ?? undefined; await startCampaign(campaignId, t); }, `${pendingCount} llamada${pendingCount !== 1 ? 's' : ''} encolada${pendingCount !== 1 ? 's' : ''}`)}
           onCancel={() => !loading && setModal(null)}
           loading={loading}
         />

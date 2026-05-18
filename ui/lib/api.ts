@@ -34,27 +34,9 @@ export interface FlowStep {
   timeout?: number;
 }
 
-export type VoiceOption =
-  | 'Polly.Mia-Neural'
-  | 'Polly.Lupe-Neural'
-  | 'Polly.Andres-Neural'
-  | 'Polly.Miguel-Neural'
-  | 'es-MX'
-  | 'es-ES';
-
-export const VOICE_OPTIONS: { value: VoiceOption; label: string; description: string }[] = [
-  { value: 'Polly.Mia-Neural',    label: 'Mía Neural (mujer, Latam)',   description: 'Amazon Polly · español México · neural' },
-  { value: 'Polly.Lupe-Neural',   label: 'Lupe Neural (mujer, Latam)',  description: 'Amazon Polly · español EEUU · neural' },
-  { value: 'Polly.Andres-Neural', label: 'Andrés Neural (hombre, Latam)', description: 'Amazon Polly · español México · neural' },
-  { value: 'Polly.Miguel-Neural', label: 'Miguel Neural (hombre, Latam)', description: 'Amazon Polly · español EEUU · neural' },
-  { value: 'es-MX',              label: 'Básica Latam (mujer)',         description: 'Twilio integrado · sin costo adicional' },
-  { value: 'es-ES',              label: 'Básica España (mujer)',        description: 'Twilio integrado · acento español' },
-];
-
 export interface VoiceFlow {
   id: string;
   campaignId: string;
-  voice: VoiceOption;
   steps: FlowStep[];
   createdAt: string;
   updatedAt: string;
@@ -69,6 +51,7 @@ export interface Campaign {
   scheduledAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  variables: Record<string, string>;
   metadata: Record<string, unknown>;
   flow?: VoiceFlow | null;
   createdAt: string;
@@ -83,9 +66,24 @@ export interface Contact {
   email: string | null;
 }
 
+export interface CampaignRecipient {
+  id: string;
+  status: string;
+  contact: { id: string; firstName: string; lastName: string | null; phone: string };
+  lastCall: {
+    id: string;
+    status: string;
+    startedAt: string | null;
+    endedAt: string | null;
+    duration: number | null;
+    responses: { stepId: string; input: string; value: string | null }[];
+  } | null;
+}
+
 export interface CampaignResults {
   campaign: Campaign;
   flow: VoiceFlow | null;
+  recipients: CampaignRecipient[];
   stats: {
     totalRecipients: number;
     recipientsByStatus: Record<string, number>;
@@ -103,16 +101,20 @@ export const getCampaignResults = (campaignId: string, token?: string) =>
 export const listContacts = (tenantId: string, token?: string) =>
   apiFetch<{ contacts: Contact[]; count: number }>(`/api/tenants/${tenantId}/contacts`, undefined, token);
 
-export const createCampaign = (tenantId: string, data: { name: string; description?: string }, token?: string) =>
+export const createCampaign = (
+  tenantId: string,
+  data: { name: string; description?: string; variables?: Record<string, string>; voiceInstructions?: string },
+  token?: string,
+) =>
   apiFetch<{ campaign: Campaign }>(`/api/tenants/${tenantId}/campaigns`, {
     method: 'POST',
     body: JSON.stringify(data),
   }, token);
 
-export const setFlow = (campaignId: string, steps: FlowStep[], token?: string, voice?: VoiceOption) =>
+export const setFlow = (campaignId: string, steps: FlowStep[], token?: string) =>
   apiFetch<{ flow: VoiceFlow }>(`/api/campaigns/${campaignId}/flow`, {
     method: 'POST',
-    body: JSON.stringify({ steps, voice }),
+    body: JSON.stringify({ steps }),
   }, token);
 
 export const addRecipients = (campaignId: string, contactIds: string[], token?: string) =>

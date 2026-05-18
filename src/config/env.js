@@ -24,6 +24,10 @@ const config = {
     secretKey: process.env.CLERK_SECRET_KEY,
   },
 
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY,
+  },
+
   nodeEnv: process.env.NODE_ENV || 'development',
 };
 

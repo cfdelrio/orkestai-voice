@@ -56,6 +56,7 @@ model Campaign {
   scheduledAt DateTime?
   startedAt   DateTime?
   completedAt DateTime?
+  variables   Json                @default("{}")
   metadata    Json                @default("{}")
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
