@@ -12,6 +12,7 @@ const { getCampaignById } = require('./campaignService');
 const { getProviderConfigForTenant } = require('./tenantService');
 const { createProvider } = require('./providerFactory');
 const { config } = require('../config/env');
+const { callQueue } = require('../queues/index');
 
 const prisma = new PrismaClient();
 const logger = createLogger('CallService');
@@ -71,117 +72,36 @@ async function startCampaign(campaignId) {
     recipientCount: pendingRecipients.length,
   });
 
-  // Get provider config and instantiate provider
-  const providerConfig = await getProviderConfigForTenant(campaign.tenantId);
-  const provider = createProvider(providerConfig);
+  // Validate provider config exists before enqueueing
+  await getProviderConfigForTenant(campaign.tenantId);
 
-  // Build webhook URL for this campaign
-  const webhookUrl = buildWebhookUrl(providerConfig.provider);
-
-  // Set campaign to active immediately (before calls are placed)
+  // Mark campaign as running immediately
   await prisma.campaign.update({
     where: { id: campaignId },
-    data: { status: 'active' },
+    data: { status: 'running', startedAt: new Date() },
   });
 
-  // Track results
-  const results = {
-    initiated: 0,
-    failed: 0,
-    errors: [],
-  };
+  // Enqueue one job per recipient (non-blocking)
+  const jobs = pendingRecipients.map((recipient) => ({
+    name: 'initiate-call',
+    data: {
+      campaignId,
+      recipientId: recipient.id,
+      tenantId: campaign.tenantId,
+      contactId: recipient.contact.id,
+      phone: recipient.contact.phone,
+    },
+  }));
 
-  // Initiate calls sequentially
-  for (const recipient of pendingRecipients) {
-    const { contact } = recipient;
+  await callQueue.addBulk(jobs);
 
-    try {
-      logger.info(`Initiating call for recipient`, {
-        recipientId: recipient.id,
-        contactId: contact.id,
-        phone: contact.phone,
-      });
-
-      const callResult = await provider.initiateCall({
-        toNumber: contact.phone,
-        fromNumber: providerConfig.fromNumber,
-        contact,
-        flow: campaign.flow,
-        webhookUrl,
-        tenantMetadata: campaign.tenant?.metadata || {},
-        recipientId: recipient.id,
-      });
-
-      // Persist Call record
-      await prisma.call.create({
-        data: {
-          campaignId,
-          recipientId: recipient.id,
-          providerCallId: callResult.providerCallId,
-          status: callResult.status || 'initiated',
-          metadata: {
-            providerConfig: providerConfig.provider,
-          },
-        },
-      });
-
-      // Mark recipient as called
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: 'called' },
-      });
-
-      results.initiated++;
-      logger.info(`Call initiated`, {
-        recipientId: recipient.id,
-        providerCallId: callResult.providerCallId,
-        status: callResult.status,
-      });
-    } catch (error) {
-      logger.error(`Failed to initiate call for recipient`, {
-        recipientId: recipient.id,
-        contactId: contact.id,
-        error: error.message,
-      });
-
-      // Persist failed Call record
-      await prisma.call.create({
-        data: {
-          campaignId,
-          recipientId: recipient.id,
-          providerCallId: null,
-          status: 'failed',
-          metadata: {
-            error: error.message,
-          },
-        },
-      });
-
-      // Mark recipient as failed
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: 'failed' },
-      });
-
-      results.failed++;
-      results.errors.push({
-        recipientId: recipient.id,
-        contactPhone: contact.phone,
-        error: error.message,
-      });
-    }
-  }
-
-  logger.info(`Campaign start completed`, {
-    campaignId,
-    ...results,
-  });
+  logger.info(`Campaign jobs enqueued`, { campaignId, count: jobs.length });
 
   return {
     campaignId,
     campaignName: campaign.name,
-    status: 'active',
-    results,
+    status: 'running',
+    enqueued: jobs.length,
   };
 }
 

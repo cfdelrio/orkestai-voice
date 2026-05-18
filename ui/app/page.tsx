@@ -1,11 +1,16 @@
-import { listCampaigns, DEFAULT_TENANT_ID, type Campaign } from '@/lib/api';
+import { listCampaigns, type Campaign } from '@/lib/api';
+import { auth } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 
 const STATUS_COLORS: Record<string, string> = {
-  draft:    'bg-slate-100 text-slate-600',
-  active:   'bg-blue-100 text-blue-700',
-  paused:   'bg-amber-100 text-amber-700',
-  completed:'bg-green-100 text-green-700',
+  draft:     'bg-slate-100 text-slate-600',
+  running:   'bg-blue-100 text-blue-700',
+  active:    'bg-blue-100 text-blue-700',
+  paused:    'bg-amber-100 text-amber-700',
+  scheduled: 'bg-purple-100 text-purple-700',
+  completed: 'bg-green-100 text-green-700',
+  failed:    'bg-red-100 text-red-700',
 };
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
@@ -38,11 +43,17 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
 }
 
 export default async function CampaignsPage() {
+  const headersList = await headers();
+  const tenantId = headersList.get('x-tenant-id') ?? process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID ?? '';
+
+  const { getToken } = await auth();
+  const token = (await getToken()) ?? undefined;
+
   let campaigns: Campaign[] = [];
   let error: string | null = null;
 
   try {
-    const data = await listCampaigns(DEFAULT_TENANT_ID);
+    const data = await listCampaigns(tenantId, token);
     campaigns = data.campaigns;
   } catch (e) {
     error = (e as Error).message;

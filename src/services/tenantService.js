@@ -63,6 +63,16 @@ async function listTenants() {
 }
 
 /**
+ * Finds a tenant by slug. Returns null if not found (no throw).
+ *
+ * @param {string} slug
+ * @returns {Promise<Object|null>}
+ */
+async function getTenantBySlug(slug) {
+  return prisma.tenant.findUnique({ where: { slug } });
+}
+
+/**
  * Finds a tenant by ID. Throws 404 if not found.
  *
  * @param {string} tenantId
@@ -153,6 +163,7 @@ module.exports = {
   createTenant,
   listTenants,
   getTenantById,
+  getTenantBySlug,
   createProviderConfig,
   getProviderConfigForTenant,
 };
