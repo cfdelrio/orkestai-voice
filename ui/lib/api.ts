@@ -27,10 +27,11 @@ async function apiFetch<T>(path: string, options?: RequestInit, token?: string):
 
 export interface FlowStep {
   id: string;
-  type: 'say' | 'dtmf_question' | 'goodbye';
+  type: 'say' | 'dtmf_question' | 'speech_question' | 'goodbye';
   text: string;
   options?: Record<string, string>;
   maxDigits?: number;
+  maxLength?: number;
   timeout?: number;
 }
 

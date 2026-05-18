@@ -150,10 +150,18 @@ export default function NewCampaignPage() {
         updated.options = { '1': 'yes', '2': 'no' };
         updated.maxDigits = updated.maxDigits ?? 1;
         updated.timeout = updated.timeout ?? 8;
+        delete updated.maxLength;
       }
-      if (update.type && update.type !== 'dtmf_question') {
+      if (update.type === 'speech_question') {
+        updated.maxLength = updated.maxLength ?? 30;
+        updated.timeout = updated.timeout ?? 5;
         delete updated.options;
         delete updated.maxDigits;
+      }
+      if (update.type && update.type !== 'dtmf_question' && update.type !== 'speech_question') {
+        delete updated.options;
+        delete updated.maxDigits;
+        delete updated.maxLength;
         delete updated.timeout;
       }
       return updated;
@@ -340,6 +348,7 @@ export default function NewCampaignPage() {
                   >
                     <option value="say">Decir</option>
                     <option value="dtmf_question">Pregunta DTMF</option>
+                    <option value="speech_question">Pregunta de voz</option>
                     <option value="goodbye">Despedida</option>
                   </select>
                   <span className="text-xs text-slate-400 font-mono flex-1">id: {s.id}</span>
@@ -370,6 +379,26 @@ export default function NewCampaignPage() {
                       Timeout (s):
                       <input
                         type="number" min={3} max={30} value={s.timeout ?? 8}
+                        onChange={(e) => updateFlowStep(i, { timeout: Number(e.target.value) })}
+                        className="w-12 border border-slate-200 rounded px-1 py-0.5 ml-1"
+                      />
+                    </label>
+                  </div>
+                )}
+                {s.type === 'speech_question' && (
+                  <div className="mt-2 flex gap-3 text-xs text-slate-500">
+                    <label className="flex items-center gap-1">
+                      Duración máx (s):
+                      <input
+                        type="number" min={5} max={120} value={s.maxLength ?? 30}
+                        onChange={(e) => updateFlowStep(i, { maxLength: Number(e.target.value) })}
+                        className="w-14 border border-slate-200 rounded px-1 py-0.5 ml-1"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1">
+                      Silencio (s):
+                      <input
+                        type="number" min={2} max={15} value={s.timeout ?? 5}
                         onChange={(e) => updateFlowStep(i, { timeout: Number(e.target.value) })}
                         className="w-12 border border-slate-200 rounded px-1 py-0.5 ml-1"
                       />

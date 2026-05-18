@@ -11,11 +11,14 @@
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
+const { PrismaClient } = require('@prisma/client');
 const { createLogger } = require('../middleware/logger');
 
 const logger = createLogger('AudioService');
+const prisma = new PrismaClient();
 
 const AUDIO_DIR = path.join(process.cwd(), 'audio');
+const RECORDINGS_DIR = path.join(process.cwd(), 'recordings');
 const VOICE = 'nova';
 // gpt-4o-mini-tts supports the `instructions` param for style/accent control
 const MODEL_WITH_INSTRUCTIONS = 'gpt-4o-mini-tts';
@@ -134,4 +137,57 @@ async function generateAudioForRecipient(recipientId, steps, vars, instructions)
   }
 }
 
-module.exports = { audioExists, getAudioUrl, generateAudio, generateAudioForRecipient, deleteAudioForCampaign };
+/**
+ * Downloads a Twilio voice recording, transcribes it with OpenAI Whisper,
+ * and updates the Response record with the transcript text.
+ * Saves the MP3 to disk at recordings/{responseId}.mp3.
+ *
+ * @param {string} recordingUrl - Twilio recording URL (no extension)
+ * @param {string} responseId   - Response record ID to update
+ * @param {string} accountSid   - Twilio Account SID for Basic Auth download
+ * @param {string} authToken    - Twilio Auth Token for Basic Auth download
+ */
+async function transcribeAndSaveRecording(recordingUrl, responseId, accountSid, authToken) {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      logger.warn('OPENAI_API_KEY not set — skipping transcription', { responseId });
+      return;
+    }
+
+    fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+
+    const mp3Url = recordingUrl.endsWith('.mp3') ? recordingUrl : `${recordingUrl}.mp3`;
+    logger.info('Downloading recording', { responseId, url: mp3Url });
+
+    const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const fetchRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
+
+    if (!fetchRes.ok) {
+      throw new Error(`Download failed: ${fetchRes.status} ${fetchRes.statusText}`);
+    }
+
+    const buffer = Buffer.from(await fetchRes.arrayBuffer());
+    const filepath = path.join(RECORDINGS_DIR, `${responseId}.mp3`);
+    fs.writeFileSync(filepath, buffer);
+
+    logger.info('Recording saved', { responseId, bytes: buffer.length });
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filepath),
+      model: 'whisper-1',
+      language: 'es',
+    });
+
+    await prisma.response.update({
+      where: { id: responseId },
+      data: { value: transcription.text },
+    });
+
+    logger.info('Transcription saved', { responseId, text: transcription.text });
+  } catch (err) {
+    logger.error('Transcription failed', { responseId, error: err.message });
+  }
+}
+
+module.exports = { audioExists, getAudioUrl, generateAudio, generateAudioForRecipient, deleteAudioForCampaign, transcribeAndSaveRecording };
