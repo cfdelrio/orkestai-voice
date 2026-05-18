@@ -34,11 +34,11 @@ export default function SettingsClient({ tenantId }: { tenantId: string }) {
   const clearToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
-    getToken().then((tok) =>
-    fetch(`/api/tenants/${tenantId}/provider-configs`, {
-      headers: { Authorization: `Bearer ${tok}` },
-    }))
-      .then((r) => r?.ok ? r.json() : null)
+    getToken()
+      .then((tok) => fetch(`/api/tenants/${tenantId}/provider-configs`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      }))
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.providerConfig) {
           setHasConfig(true);
@@ -48,7 +48,7 @@ export default function SettingsClient({ tenantId }: { tenantId: string }) {
         }
       })
       .catch(() => {})
-      .finally(() => setFetching(false)));
+      .finally(() => setFetching(false));
   }, [tenantId, getToken]);
 
   async function handleSubmit(e: React.FormEvent) {
