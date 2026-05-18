@@ -57,6 +57,56 @@ async function createCampaign(tenantId, { name, description, variables = {}, voi
 }
 
 /**
+ * Updates campaign voice instructions and/or variables.
+ * Clears pre-generated audio cache when voice instructions change so the next call
+ * regenerates audio with the new instructions.
+ *
+ * @param {string} campaignId
+ * @param {Object} data
+ * @param {string} [data.voiceInstructions]
+ * @param {Object} [data.variables]
+ * @returns {Promise<Object>} Updated campaign record
+ */
+async function updateCampaign(campaignId, { voiceInstructions, variables }) {
+  const campaign = await getCampaignById(campaignId);
+
+  const updateData = {};
+
+  if (variables !== undefined) {
+    updateData.variables = variables;
+  }
+
+  if (voiceInstructions !== undefined) {
+    const currentMeta = (campaign.metadata && typeof campaign.metadata === 'object') ? campaign.metadata : {};
+    updateData.metadata = { ...currentMeta, voiceInstructions: voiceInstructions.trim() };
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return campaign;
+  }
+
+  const updated = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: updateData,
+  });
+
+  // Clear audio cache so next call regenerates with new instructions
+  if (voiceInstructions !== undefined && campaign.flow?.steps) {
+    const recipients = await prisma.campaignRecipient.findMany({
+      where: { campaignId },
+      select: { id: true },
+    });
+    if (recipients.length > 0) {
+      deleteAudioForCampaign(recipients.map((r) => r.id), campaign.flow.steps.map((s) => s.id));
+      logger.info('Audio cache cleared after voice instructions update', { campaignId });
+    }
+  }
+
+  logger.info('Campaign updated', { campaignId });
+  return updated;
+}
+
+/**
  * Lists all campaigns for a tenant.
  *
  * @param {string} tenantId
@@ -461,6 +511,7 @@ async function deleteCampaign(campaignId) {
 
 module.exports = {
   createCampaign,
+  updateCampaign,
   listCampaigns,
   getCampaignById,
   validateFlowSteps,

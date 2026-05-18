@@ -148,6 +148,25 @@ campaignRouter.patch('/:campaignId/resume', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * PATCH /api/campaigns/:campaignId
+ * Updates campaign voice instructions and/or variables.
+ * Clears pre-generated audio cache when voice instructions change.
+ *
+ * Body: { voiceInstructions?, variables? }
+ */
+campaignRouter.patch('/:campaignId', asyncHandler(async (req, res) => {
+  const { campaignId } = req.params;
+  const { voiceInstructions, variables } = req.body;
+
+  const campaign = await campaignService.updateCampaign(campaignId, {
+    voiceInstructions: typeof voiceInstructions === 'string' ? voiceInstructions : undefined,
+    variables: variables && typeof variables === 'object' ? variables : undefined,
+  });
+
+  res.json({ campaign });
+}));
+
+/**
  * DELETE /api/campaigns/:campaignId
  * Deletes a campaign and all associated data (flow, recipients, calls, responses).
  * Running campaigns cannot be deleted.

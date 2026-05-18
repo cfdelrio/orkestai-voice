@@ -384,8 +384,8 @@ async function getTwimlAfterRecording(recipientId, stepId, recordingUrl, recordi
 
         logger.info('Voice recording response saved', { callId: call.id, stepId, responseId: response.id });
 
-        // Download + transcribe in background — don't block TwiML response
-        setImmediate(async () => {
+        // Download + transcribe in background — delay 8s to ensure Twilio has the file ready
+        setTimeout(async () => {
           try {
             const providerConfig = await getProviderConfigForTenant(campaign.tenantId);
             const accountSid = providerConfig.apiKey;
@@ -394,7 +394,7 @@ async function getTwimlAfterRecording(recipientId, stepId, recordingUrl, recordi
           } catch (err) {
             logger.error('Failed to start transcription', { responseId: response.id, error: err.message });
           }
-        });
+        }, 8000);
       } else {
         logger.warn('No call found to attach recording response', { recipientId, stepId });
       }

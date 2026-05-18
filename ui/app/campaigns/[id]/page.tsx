@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { CampaignActions } from './CampaignActions';
 import { CampaignCharts } from './CampaignCharts';
 import { AddRecipientsModal } from './AddRecipientsModal';
+import { VoiceInstructionsEditor } from './VoiceInstructionsEditor';
 
 const STATUS_COLORS: Record<string, string> = {
   draft:      'bg-slate-100 text-slate-600',
@@ -150,6 +151,13 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
           <CampaignActions campaignId={campaign.id} status={campaign.status} pendingCount={pendingCount} />
         </div>
       </div>
+
+      {/* Voice instructions editor */}
+      <VoiceInstructionsEditor
+        campaignId={campaign.id}
+        initialInstructions={String(campaign.metadata?.voiceInstructions ?? '')}
+        token={token}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

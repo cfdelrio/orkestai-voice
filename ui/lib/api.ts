@@ -127,6 +127,16 @@ export const addRecipients = (campaignId: string, contactIds: string[], token?: 
 export const startCampaign = (campaignId: string, token?: string) =>
   apiFetch(`/api/campaigns/${campaignId}/start`, { method: 'POST' }, token);
 
+export const updateCampaign = (
+  campaignId: string,
+  data: { voiceInstructions?: string; variables?: Record<string, string> },
+  token?: string,
+) =>
+  apiFetch<{ campaign: Campaign }>(`/api/campaigns/${campaignId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
+
 export const pauseCampaign = (campaignId: string, token?: string) =>
   apiFetch(`/api/campaigns/${campaignId}/pause`, { method: 'PATCH' }, token);
 
