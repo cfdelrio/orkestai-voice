@@ -35,7 +35,7 @@ jobs:
 
           sudo -u orkestai git fetch origin
           sudo -u orkestai git checkout "$BRANCH"
-          sudo -u orkestai git pull origin "$BRANCH"
+          sudo -u orkestai git reset --hard origin/"$BRANCH"
 
           sudo -u orkestai npm ci
           sudo -u orkestai npx prisma generate
