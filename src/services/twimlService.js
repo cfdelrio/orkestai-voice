@@ -74,7 +74,7 @@ function buildTwimlVerbs(steps, vars, webhookBase, recipientId) {
     const text = escapeXml(interpolateTemplate(step.text || '', vars));
 
     if (step.type === 'say') {
-      xml += `<Say language="es-MX">${text}</Say>`;
+      xml += `<Say language="es-ES">${text}</Say>`;
 
     } else if (step.type === 'dtmf_question') {
       const numDigits = step.maxDigits || 1;
@@ -82,11 +82,11 @@ function buildTwimlVerbs(steps, vars, webhookBase, recipientId) {
       const action    = `${webhookBase}/api/twiml/recipients/${recipientId}/gather/${step.id}`;
 
       xml += `<Gather numDigits="${numDigits}" action="${action}" method="POST" timeout="${timeout}">`;
-      xml += `<Say language="es-MX">${text}</Say>`;
+      xml += `<Say language="es-ES">${text}</Say>`;
       xml += `</Gather>`;
 
     } else if (step.type === 'goodbye') {
-      xml += `<Say language="es-MX">${text}</Say>`;
+      xml += `<Say language="es-ES">${text}</Say>`;
       xml += `<Hangup/>`;
       hasGoodbye = true;
       break; // Nothing should come after a goodbye step
