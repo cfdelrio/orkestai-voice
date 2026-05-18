@@ -38,8 +38,9 @@ jobs:
           sudo -u orkestai git pull origin "$BRANCH"
 
           sudo -u orkestai npm ci
+          sudo -u orkestai npx prisma generate
 
-          sudo -u orkestai bash -c "cd /opt/orkestai-voice/ui && rm -rf node_modules && npm ci && npm run build"
+          sudo -u orkestai bash -c "cd /opt/orkestai-voice/ui && rm -rf node_modules && npm ci && NEXT_NO_TURBOPACK=1 npm run build"
 
           sudo -u orkestai pm2 startOrRestart /opt/orkestai-voice/ecosystem.config.js --env production
           sudo -u orkestai pm2 save
