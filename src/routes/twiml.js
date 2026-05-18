@@ -35,7 +35,7 @@ function getWebhookBase() {
  * Twilio fetches this when the outbound call is answered.
  * Returns the initial TwiML for the recipient's campaign flow.
  */
-router.get('/recipients/:recipientId', async (req, res) => {
+router.all('/recipients/:recipientId', async (req, res) => {
   const { recipientId } = req.params;
 
   logger.info('TwiML initial fetch', { recipientId, method: 'GET' });
