@@ -8,6 +8,7 @@ const { notFound, badRequest } = require('../middleware/errorHandler');
 const { getTenantById } = require('./tenantService');
 const { validateContactsForTenant } = require('./contactService');
 const { callQueue } = require('../queues/index');
+const { deleteAudioForCampaign } = require('./audioService');
 
 const prisma = new PrismaClient();
 const logger = createLogger('CampaignService');
@@ -178,6 +179,15 @@ async function setFlow(campaignId, { steps, voice }) {
   });
 
   logger.info(`VoiceFlow set`, { flowId: flow.id, campaignId, stepCount: steps.length, voice: resolvedVoice });
+
+  // Delete stale audio files so the next call uses fresh TTS with the updated text
+  const recipients = await prisma.campaignRecipient.findMany({
+    where: { campaignId },
+    select: { id: true },
+  });
+  if (recipients.length > 0) {
+    deleteAudioForCampaign(recipients.map((r) => r.id), steps.map((s) => s.id));
+  }
 
   return { ...flow, campaignName: campaign.name };
 }
