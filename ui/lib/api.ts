@@ -1,7 +1,7 @@
 const API_URL =
   typeof window === 'undefined'
     ? (process.env.API_BASE_URL ?? 'http://localhost:3000')
-    : (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000');
+    : (process.env.NEXT_PUBLIC_API_URL ?? '');
 
 async function apiFetch<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
   const authHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
