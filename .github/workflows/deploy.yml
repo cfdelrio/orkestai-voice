@@ -14,30 +14,37 @@ jobs:
 
     steps:
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GITHUB_REF_NAME
-          script: |
-            set -e
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Write key to file preserving exact format
+          echo "$SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
 
-            cd /opt/orkestai-voice
+          ssh -i /tmp/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=60 \
+            "$EC2_USER@$EC2_HOST" \
+            "BRANCH='$BRANCH' bash -s" << 'SCRIPT'
+          set -e
 
-            # Pull latest code
-            sudo -u orkestai git fetch origin
-            sudo -u orkestai git checkout "$GITHUB_REF_NAME"
-            sudo -u orkestai git pull origin "$GITHUB_REF_NAME"
+          cd /opt/orkestai-voice
 
-            # Backend dependencies
-            sudo -u orkestai npm ci
+          sudo -u orkestai git fetch origin
+          sudo -u orkestai git checkout "$BRANCH"
+          sudo -u orkestai git pull origin "$BRANCH"
 
-            # Frontend dependencies + build
-            sudo -u orkestai bash -c "cd /opt/orkestai-voice/ui && npm ci && npm run build"
+          sudo -u orkestai npm ci
 
-            # Restart all PM2 processes
-            sudo -u orkestai pm2 startOrRestart /opt/orkestai-voice/ecosystem.config.js --env production
-            sudo -u orkestai pm2 save
+          sudo -u orkestai bash -c "cd /opt/orkestai-voice/ui && npm ci && npm run build"
 
-            echo "Deploy complete"
+          sudo -u orkestai pm2 startOrRestart /opt/orkestai-voice/ecosystem.config.js --env production
+          sudo -u orkestai pm2 save
+
+          echo "Deploy complete"
+          SCRIPT
+
+          rm -f /tmp/deploy_key
