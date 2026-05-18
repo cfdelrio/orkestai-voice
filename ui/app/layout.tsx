@@ -3,6 +3,8 @@ import './globals.css';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { ClerkProvider, Show, UserButton, SignInButton } from '@clerk/nextjs';
+
+export const dynamic = 'force-dynamic';
 import Providers from './providers';
 
 export const metadata: Metadata = {
