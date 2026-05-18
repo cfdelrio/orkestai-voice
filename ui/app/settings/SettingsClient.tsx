@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@clerk/nextjs';
 
 const PROVIDERS = [
   { value: 'twilio', label: 'Twilio' },
@@ -20,7 +21,8 @@ function Toast({ message, type, onDone }: { message: string; type: 'success' | '
   );
 }
 
-export default function SettingsClient({ tenantId, token }: { tenantId: string; token: string }) {
+export default function SettingsClient({ tenantId }: { tenantId: string }) {
+  const { getToken } = useAuth();
   const [provider, setProvider] = useState('twilio');
   const [accountSid, setAccountSid] = useState('');
   const [authToken, setAuthToken] = useState('');
@@ -32,10 +34,11 @@ export default function SettingsClient({ tenantId, token }: { tenantId: string; 
   const clearToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
+    getToken().then((tok) =>
     fetch(`/api/tenants/${tenantId}/provider-configs`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.ok ? r.json() : null)
+      headers: { Authorization: `Bearer ${tok}` },
+    }))
+      .then((r) => r?.ok ? r.json() : null)
       .then((data) => {
         if (data?.providerConfig) {
           setHasConfig(true);
@@ -45,13 +48,14 @@ export default function SettingsClient({ tenantId, token }: { tenantId: string; 
         }
       })
       .catch(() => {})
-      .finally(() => setFetching(false));
-  }, [tenantId, token]);
+      .finally(() => setFetching(false)));
+  }, [tenantId, getToken]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
+      const tok = await getToken();
       const body: Record<string, unknown> = {
         provider,
         apiKey: accountSid.trim(),
@@ -62,7 +66,7 @@ export default function SettingsClient({ tenantId, token }: { tenantId: string; 
 
       const res = await fetch(`/api/tenants/${tenantId}/provider-configs`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
         body: JSON.stringify(body),
       });
 
