@@ -121,6 +121,15 @@ export const linkUser = (tenantId: string, role: string | undefined, token: stri
 export const deleteCampaign = (campaignId: string, token?: string) =>
   apiFetch<{ deleted: boolean; campaignId: string }>(`/api/campaigns/${campaignId}`, { method: 'DELETE' }, token);
 
+export const createContact = (tenantId: string, data: { firstName: string; lastName?: string; phone: string; email?: string }, token?: string) =>
+  apiFetch<{ contact: Contact }>(`/api/tenants/${tenantId}/contacts`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteContact = (tenantId: string, contactId: string, token?: string) =>
+  apiFetch<{ deleted: boolean }>(`/api/tenants/${tenantId}/contacts/${contactId}`, { method: 'DELETE' }, token);
+
 export const createTenantOnboarding = (name: string, slug: string, token: string) =>
   apiFetch<{ tenant: { id: string; name: string; slug: string }; user: { id: string }; created: boolean }>('/api/onboarding', {
     method: 'POST',

@@ -28,6 +28,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 Campañas
               </Link>
+              <Link href="/contacts" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
+                Contactos
+              </Link>
               <Link href="/analytics" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 Analytics
               </Link>
