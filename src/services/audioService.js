@@ -148,30 +148,46 @@ async function generateAudioForRecipient(recipientId, steps, vars, instructions)
  * @param {string} authToken    - Twilio Auth Token for Basic Auth download
  */
 async function transcribeAndSaveRecording(recordingUrl, responseId, accountSid, authToken) {
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn('OPENAI_API_KEY not set — skipping transcription', { responseId });
+    return;
+  }
+
+  fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+
+  const mp3Url = recordingUrl.endsWith('.mp3') ? recordingUrl : `${recordingUrl}.mp3`;
+  const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+  const filepath = path.join(RECORDINGS_DIR, `${responseId}.mp3`);
+
+  // Retry download up to 3 times — Twilio sometimes takes a few seconds to make the file available
+  const RETRY_DELAYS = [0, 10000, 20000];
+  let downloadedOk = false;
+
+  for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
+    if (RETRY_DELAYS[attempt] > 0) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+    }
+    try {
+      logger.info('Downloading recording', { responseId, attempt: attempt + 1, url: mp3Url });
+      const fetchRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
+      if (!fetchRes.ok) throw new Error(`HTTP ${fetchRes.status} ${fetchRes.statusText}`);
+
+      const buffer = Buffer.from(await fetchRes.arrayBuffer());
+      fs.writeFileSync(filepath, buffer);
+      logger.info('Recording saved', { responseId, bytes: buffer.length });
+      downloadedOk = true;
+      break;
+    } catch (err) {
+      logger.warn('Recording download attempt failed', { responseId, attempt: attempt + 1, error: err.message });
+    }
+  }
+
+  if (!downloadedOk) {
+    logger.error('Recording download failed after all retries', { responseId });
+    return;
+  }
+
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      logger.warn('OPENAI_API_KEY not set — skipping transcription', { responseId });
-      return;
-    }
-
-    fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
-
-    const mp3Url = recordingUrl.endsWith('.mp3') ? recordingUrl : `${recordingUrl}.mp3`;
-    logger.info('Downloading recording', { responseId, url: mp3Url });
-
-    const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-    const fetchRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
-
-    if (!fetchRes.ok) {
-      throw new Error(`Download failed: ${fetchRes.status} ${fetchRes.statusText}`);
-    }
-
-    const buffer = Buffer.from(await fetchRes.arrayBuffer());
-    const filepath = path.join(RECORDINGS_DIR, `${responseId}.mp3`);
-    fs.writeFileSync(filepath, buffer);
-
-    logger.info('Recording saved', { responseId, bytes: buffer.length });
-
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(filepath),
@@ -186,7 +202,7 @@ async function transcribeAndSaveRecording(recordingUrl, responseId, accountSid, 
 
     logger.info('Transcription saved', { responseId, text: transcription.text });
   } catch (err) {
-    logger.error('Transcription failed', { responseId, error: err.message });
+    logger.error('Whisper transcription failed', { responseId, error: err.message });
   }
 }
 
