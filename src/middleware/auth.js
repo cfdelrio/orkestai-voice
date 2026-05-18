@@ -1,11 +1,9 @@
-const { createClerkClient } = require('@clerk/backend');
+const { verifyToken } = require('@clerk/backend');
 const { PrismaClient } = require('@prisma/client');
 const { createLogger } = require('./logger');
 
 const prisma = new PrismaClient();
 const logger = createLogger('Auth');
-
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 // Routes that skip auth entirely
 const PUBLIC_PREFIXES = [
@@ -33,7 +31,7 @@ async function extractToken(req) {
 }
 
 async function verifyClerkToken(token) {
-  const payload = await clerk.verifyToken(token);
+  const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
   return payload; // { sub: clerkUserId, ... }
 }
 
