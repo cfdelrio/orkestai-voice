@@ -61,9 +61,15 @@ export default clerkMiddleware(async (auth, req) => {
       if (token) {
         const slug = await getUserTenantSlug(token);
         if (slug) {
+          // Tiene tenant → redirigir al subdominio
           const url = req.nextUrl.clone();
           url.host = `${slug}.${BASE_DOMAIN}`;
           url.port = '';
+          return NextResponse.redirect(url);
+        } else if (!req.nextUrl.pathname.startsWith('/onboarding')) {
+          // Sin tenant → onboarding
+          const url = req.nextUrl.clone();
+          url.pathname = '/onboarding';
           return NextResponse.redirect(url);
         }
       }

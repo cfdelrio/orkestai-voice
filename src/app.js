@@ -22,6 +22,7 @@ const { tenantRouter: campaignTenantRouter, campaignRouter } = require('./routes
 const webhooksRouter = require('./routes/webhooks');
 const twimlRouter = require('./routes/twiml');
 const usersRouter = require('./routes/users');
+const onboardingRouter = require('./routes/onboarding');
 
 const app = express();
 const logger = createLogger('App');
@@ -55,6 +56,9 @@ app.use('/api', requireAuth);
 
 // User management
 app.use('/api/users', usersRouter);
+
+// Onboarding (creates tenant + links user — token-only, no existing User required)
+app.use('/api/onboarding', onboardingRouter);
 
 // Tenant management
 app.use('/api/tenants', tenantsRouter);
