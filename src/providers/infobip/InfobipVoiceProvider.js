@@ -75,7 +75,7 @@ class InfobipVoiceProvider extends VoiceProvider {
       to:                  toNumber,
       text:                fullText,
       language:            'es',
-      voice:               { name: 'es-ES-Standard-A', gender: 'female' },
+      voice:               { gender: 'female' },
       notifyUrl:           webhookUrl,
       notifyContentType:   'application/json',
       callbackData:        JSON.stringify({ contactId: contact.id, campaignId: flow.campaignId }),
@@ -179,7 +179,7 @@ class InfobipVoiceProvider extends VoiceProvider {
           say: {
             text,
             language: 'es',
-            voice:    { name: 'es-ES-Standard-A', gender: 'female' },
+            voice:    { gender: 'female' },
           },
         });
       } else if (step.type === 'dtmf_question') {
@@ -189,7 +189,7 @@ class InfobipVoiceProvider extends VoiceProvider {
             say: {
               text,
               language: 'es',
-              voice:    { name: 'es-ES-Standard-A', gender: 'female' },
+              voice:    { gender: 'female' },
             },
             dtmf: {
               maxInputLength: step.maxDigits || 1,
@@ -203,7 +203,7 @@ class InfobipVoiceProvider extends VoiceProvider {
           say: {
             text,
             language: 'es',
-            voice:    { name: 'es-ES-Standard-A', gender: 'female' },
+            voice:    { gender: 'female' },
           },
         });
         ivrSteps.push({ type: 'HANGUP' });
