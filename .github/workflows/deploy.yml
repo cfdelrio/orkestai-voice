@@ -20,8 +20,8 @@ jobs:
           EC2_USER: ${{ secrets.EC2_USER }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          # Write key to file preserving exact format
-          echo "$SSH_KEY" > /tmp/deploy_key
+          # Decode base64 key preserving exact format
+          echo "$SSH_KEY" | base64 -d > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
           ssh -i /tmp/deploy_key \
