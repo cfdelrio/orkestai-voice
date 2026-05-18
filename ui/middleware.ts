@@ -61,6 +61,7 @@ export default clerkMiddleware(async (auth, req) => {
         if (slug) {
           const url = req.nextUrl.clone();
           url.host = `${slug}.${BASE_DOMAIN}`;
+          url.port = '';
           return NextResponse.redirect(url);
         }
       }
@@ -68,7 +69,7 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } });
-});
+}, { debug: false });
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
