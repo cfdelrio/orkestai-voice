@@ -31,6 +31,9 @@ async function extractToken(req) {
 }
 
 async function verifyClerkToken(token) {
+  if (!process.env.CLERK_SECRET_KEY) {
+    throw new Error('CLERK_SECRET_KEY no está configurada en el servidor');
+  }
   const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
   return payload; // { sub: clerkUserId, ... }
 }
@@ -59,8 +62,8 @@ async function requireAuth(req, res, next) {
     req.tenantId = user.tenantId;
     next();
   } catch (err) {
-    logger.warn('Auth failed', { error: err.message });
-    return res.status(401).json({ error: { message: 'Invalid or expired token' } });
+    logger.warn('Auth failed', { error: err.message, code: err.code, status: err.status, stack: err.stack?.split('\n')[0] });
+    return res.status(401).json({ error: { message: 'Invalid or expired token', detail: err.message } });
   }
 }
 

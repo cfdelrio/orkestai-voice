@@ -25,6 +25,20 @@ async function resolveTenantSlug(host: string): Promise<{ id: string; slug: stri
   }
 }
 
+async function getUserTenantSlug(token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const { user } = await res.json();
+    return user?.tenant?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
     await auth.protect();
@@ -37,6 +51,20 @@ export default clerkMiddleware(async (auth, req) => {
   if (tenant) {
     requestHeaders.set('x-tenant-id', tenant.id);
     requestHeaders.set('x-tenant-slug', tenant.slug);
+  } else {
+    // Dominio base sin subdominio: redirigir al subdominio del tenant del usuario
+    const { userId, getToken } = await auth();
+    if (userId) {
+      const token = await getToken();
+      if (token) {
+        const slug = await getUserTenantSlug(token);
+        if (slug) {
+          const url = req.nextUrl.clone();
+          url.host = `${slug}.${BASE_DOMAIN}`;
+          return NextResponse.redirect(url);
+        }
+      }
+    }
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } });
