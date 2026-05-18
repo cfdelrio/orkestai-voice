@@ -5,15 +5,15 @@ const { createLogger } = require('./logger');
 const prisma = new PrismaClient();
 const logger = createLogger('Auth');
 
-// Routes that skip auth entirely
+// Routes that skip auth entirely (relative to /api mount point)
 const PUBLIC_PREFIXES = [
-  '/api/webhooks/',
-  '/api/twiml/',
-  '/health',
+  '/webhooks/',
+  '/twiml/',
 ];
 // Routes that verify the JWT but don't require a linked User record in DB
 const TOKEN_ONLY_PATHS = [
-  '/api/users/link',
+  '/users/link',
+  '/tenants/slug/',
 ];
 
 function isPublic(path) {
