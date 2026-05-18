@@ -41,53 +41,6 @@ jobs:
 
           sudo -u orkestai bash -c "cd /opt/orkestai-voice/ui && rm -rf node_modules && npm ci && npm run build"
 
-          # Fix nginx proxy headers for Next.js
-          sudo tee /etc/nginx/conf.d/orkestai-voice.conf > /dev/null << 'NGINXEOF'
-upstream orkestai_api { server 127.0.0.1:3000; keepalive 64; }
-upstream orkestai_ui  { server 127.0.0.1:3001; keepalive 32; }
-
-server {
-    listen 80;
-    server_name voice.orkestai.com.ar *.voice.orkestai.com.ar;
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl;
-    server_name voice.orkestai.com.ar *.voice.orkestai.com.ar;
-    ssl_certificate /etc/letsencrypt/live/voice.orkestai.com.ar/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/voice.orkestai.com.ar/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-    client_max_body_size 10M;
-
-    location /api/ {
-        proxy_pass http://orkestai_api;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_read_timeout 60s;
-    }
-
-    location / {
-        proxy_pass http://orkestai_ui;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Port 443;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_read_timeout 60s;
-    }
-}
-NGINXEOF
-          sudo nginx -t && sudo systemctl reload nginx
-
           sudo -u orkestai pm2 startOrRestart /opt/orkestai-voice/ecosystem.config.js --env production
           sudo -u orkestai pm2 save
 
