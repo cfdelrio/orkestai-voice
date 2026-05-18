@@ -15,7 +15,7 @@
 
 const { Router } = require('express');
 const { config } = require('../config/env');
-const { getTwimlForRecipient, getTwimlAfterGather, hangupTwiml } = require('../services/twimlService');
+const { getTwimlForRecipient, getTwimlAfterGather, getTwimlAfterRecording, hangupTwiml } = require('../services/twimlService');
 const { createLogger } = require('../middleware/logger');
 
 const router = Router();
@@ -84,6 +84,38 @@ router.post('/recipients/:recipientId/gather/:stepId', async (req, res) => {
       error: error.message,
     });
     // Always return valid TwiML so Twilio doesn't retry
+    res.status(200).send(hangupTwiml());
+  }
+});
+
+/**
+ * POST /api/twiml/recipients/:recipientId/recording/:stepId
+ *
+ * Twilio POSTs here after a <Record> verb completes (caller stopped speaking
+ * or maxLength was reached). The body contains RecordingUrl, RecordingSid,
+ * and RecordingDuration. We save the recording URL, kick off Whisper
+ * transcription asynchronously, and return TwiML for the remaining steps.
+ */
+router.post('/recipients/:recipientId/recording/:stepId', async (req, res) => {
+  const { recipientId, stepId } = req.params;
+  const recordingUrl      = req.body?.RecordingUrl      || '';
+  const recordingSid      = req.body?.RecordingSid      || '';
+  const recordingDuration = parseInt(req.body?.RecordingDuration || '0', 10);
+
+  logger.info('TwiML recording callback', { recipientId, stepId, recordingSid, duration: recordingDuration });
+
+  res.set('Content-Type', 'text/xml');
+
+  try {
+    const webhookBase = getWebhookBase();
+    const twiml = await getTwimlAfterRecording(
+      recipientId, stepId, recordingUrl, recordingSid, recordingDuration, webhookBase,
+    );
+    res.status(200).send(twiml);
+  } catch (error) {
+    logger.error('Error generating post-recording TwiML', {
+      recipientId, stepId, error: error.message,
+    });
     res.status(200).send(hangupTwiml());
   }
 });

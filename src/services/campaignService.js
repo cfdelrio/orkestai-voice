@@ -16,7 +16,7 @@ const logger = createLogger('CampaignService');
 /**
  * Valid VoiceFlow step types.
  */
-const VALID_STEP_TYPES = ['say', 'dtmf_question', 'goodbye'];
+const VALID_STEP_TYPES = ['say', 'dtmf_question', 'speech_question', 'goodbye'];
 
 /**
  * Creates a new campaign for a tenant.

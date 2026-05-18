@@ -61,7 +61,13 @@ function RecipientRow({ r, stepLabels }: { r: CampaignRecipient; stepLabels: Rec
               const stepText = stepLabels[resp.stepId];
               return (
                 <span key={resp.stepId} className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded mr-1">
-                  {stepText ? `${stepText.slice(0, 20)}…` : resp.stepId}: <strong>{resp.value ?? resp.input}</strong>
+                  {stepText ? `${stepText.slice(0, 20)}…` : resp.stepId}:{' '}
+                  {resp.value
+                    ? <strong>&ldquo;{resp.value}&rdquo;</strong>
+                    : resp.input?.startsWith('https://')
+                      ? <em className="text-slate-400">transcribiendo…</em>
+                      : <strong>{resp.input}</strong>
+                  }
                 </span>
               );
             })

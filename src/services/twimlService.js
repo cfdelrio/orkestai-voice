@@ -15,7 +15,8 @@
 const { PrismaClient } = require('@prisma/client');
 const { interpolateTemplate } = require('./templateEngine');
 const { createLogger } = require('../middleware/logger');
-const { audioExists, getAudioUrl } = require('./audioService');
+const { audioExists, getAudioUrl, transcribeAndSaveRecording } = require('./audioService');
+const { getProviderConfigForTenant } = require('./tenantService');
 
 const prisma = new PrismaClient();
 const logger = createLogger('TwimlService');
@@ -107,6 +108,17 @@ function buildTwimlVerbs(steps, vars, webhookBase, recipientId, voice) {
       xml += `<Gather numDigits="${numDigits}" action="${action}" method="POST" timeout="${timeout}">`;
       xml += audioTag;
       xml += `</Gather>`;
+
+    } else if (step.type === 'speech_question') {
+      const maxLength = step.maxLength || 30;
+      const timeout   = step.timeout   || 5;
+      const action    = `${webhookBase}/api/twiml/recipients/${recipientId}/recording/${step.id}`;
+
+      xml += audioTag;
+      xml += `<Record action="${action}" method="POST" maxLength="${maxLength}" timeout="${timeout}" playBeep="true" />`;
+      // <Record> transfers control to action URL — no trailing <Hangup/> needed here
+      hasGoodbye = true;
+      break;
 
     } else if (step.type === 'goodbye') {
       xml += audioTag;
@@ -306,8 +318,114 @@ async function getTwimlAfterGather(recipientId, stepId, digit, webhookBase) {
   return twiml;
 }
 
+/**
+ * Generates TwiML for the steps that come after a <Record> verb completes,
+ * persists the recording URL as a Response, and kicks off async Whisper transcription.
+ *
+ * Twilio POSTs to POST /api/twiml/recipients/:recipientId/recording/:stepId
+ * when the caller finishes speaking (or silence timeout).
+ *
+ * @param {string} recipientId      - CampaignRecipient UUID
+ * @param {string} stepId           - The speech_question step that triggered the recording
+ * @param {string} recordingUrl     - Twilio recording URL (needs .mp3 suffix to download)
+ * @param {string} recordingSid     - Twilio recording SID
+ * @param {number} recordingDuration - Duration in seconds
+ * @param {string} webhookBase      - Base URL for subsequent action URLs
+ * @returns {Promise<string>} Complete TwiML XML document
+ */
+async function getTwimlAfterRecording(recipientId, stepId, recordingUrl, recordingSid, recordingDuration, webhookBase) {
+  logger.info('Generating post-recording TwiML', { recipientId, stepId, recordingSid, duration: recordingDuration });
+
+  let recipient;
+  try {
+    recipient = await prisma.campaignRecipient.findUnique({
+      where: { id: recipientId },
+      include: {
+        contact: true,
+        campaign: {
+          include: { flow: true, tenant: true },
+        },
+      },
+    });
+  } catch (err) {
+    logger.error('DB error for post-recording TwiML', { recipientId, stepId, error: err.message });
+    return hangupTwiml();
+  }
+
+  if (!recipient) {
+    logger.warn('Recipient not found for post-recording TwiML', { recipientId });
+    return hangupTwiml();
+  }
+
+  const { contact, campaign } = recipient;
+  const flow = campaign?.flow;
+
+  if (!flow || !Array.isArray(flow.steps)) {
+    return hangupTwiml();
+  }
+
+  // ─── Persist recording URL and kick off async transcription ──────────────
+  if (recordingUrl) {
+    try {
+      const call = await prisma.call.findFirst({
+        where: { recipientId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (call) {
+        const response = await prisma.response.create({
+          data: {
+            callId: call.id,
+            stepId,
+            input: recordingUrl,
+            value: null, // populated async by Whisper
+          },
+        });
+
+        logger.info('Voice recording response saved', { callId: call.id, stepId, responseId: response.id });
+
+        // Download + transcribe in background — don't block TwiML response
+        setImmediate(async () => {
+          try {
+            const providerConfig = await getProviderConfigForTenant(campaign.tenantId);
+            const accountSid = providerConfig.apiKey;
+            const authToken = providerConfig.metadata?.authToken;
+            await transcribeAndSaveRecording(recordingUrl, response.id, accountSid, authToken);
+          } catch (err) {
+            logger.error('Failed to start transcription', { responseId: response.id, error: err.message });
+          }
+        });
+      } else {
+        logger.warn('No call found to attach recording response', { recipientId, stepId });
+      }
+    } catch (err) {
+      logger.error('Failed to persist recording response', { recipientId, stepId, error: err.message });
+    }
+  }
+
+  // ─── Build TwiML for remaining steps ─────────────────────────────────────
+  const stepIndex = flow.steps.findIndex((s) => s.id === stepId);
+  const remainingSteps = stepIndex >= 0 ? flow.steps.slice(stepIndex + 1) : [];
+
+  if (remainingSteps.length === 0) {
+    return wrapResponse('<Hangup/>');
+  }
+
+  const campaignVars = campaign.variables && typeof campaign.variables === 'object' ? campaign.variables : {};
+  const vars = {
+    ...campaignVars,
+    firstName: contact.firstName || '',
+    lastName:  contact.lastName  || '',
+    phone:     contact.phone     || '',
+  };
+
+  const verbs = buildTwimlVerbs(remainingSteps, vars, webhookBase, recipientId, flow.voice);
+  return wrapResponse(verbs);
+}
+
 module.exports = {
   getTwimlForRecipient,
   getTwimlAfterGather,
+  getTwimlAfterRecording,
   hangupTwiml,
 };
