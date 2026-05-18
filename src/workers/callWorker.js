@@ -5,6 +5,9 @@ const { getProviderConfigForTenant } = require('../services/tenantService');
 const { createProvider } = require('../services/providerFactory');
 const { buildWebhookUrl } = require('../services/callService');
 const { getRedisConnection } = require('../queues/redis');
+const { generateAudioForRecipient } = require('../services/audioService');
+const { interpolateTemplate } = require('../services/templateEngine');
+const { config } = require('../config/env');
 
 const prisma = new PrismaClient();
 const logger = createLogger('CallWorker');
@@ -38,6 +41,28 @@ async function processCallJob(job) {
   const campaign = recipient.campaign;
   const provider = createProvider(providerConfig);
   const webhookUrl = buildWebhookUrl(providerConfig.provider);
+
+  // Pre-generate TTS audio for all flow steps before initiating the call.
+  // This ensures Twilio can fetch <Play> URLs the moment the call connects.
+  if (campaign.flow?.steps && process.env.OPENAI_API_KEY) {
+    const campaignVars = campaign.variables && typeof campaign.variables === 'object'
+      ? campaign.variables : {};
+    const vars = {
+      ...campaignVars,
+      firstName: recipient.contact.firstName || '',
+      lastName:  recipient.contact.lastName  || '',
+      phone:     recipient.contact.phone     || '',
+    };
+    try {
+      await generateAudioForRecipient(recipientId, campaign.flow.steps, vars);
+    } catch (audioErr) {
+      // Non-fatal: fall back to <Say> in TwiML if audio generation fails
+      logger.warn('Audio pre-generation failed — will use Say fallback', {
+        recipientId,
+        error: audioErr.message,
+      });
+    }
+  }
 
   try {
     const callResult = await provider.initiateCall({
