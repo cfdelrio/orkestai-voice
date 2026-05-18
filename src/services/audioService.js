@@ -34,6 +34,29 @@ function audioExists(recipientId, stepId) {
   return fs.existsSync(getFilepath(recipientId, stepId));
 }
 
+/**
+ * Deletes all pre-generated audio files for every recipient of a campaign.
+ * Called when the flow is updated so stale audio doesn't get served.
+ *
+ * @param {string[]} recipientIds
+ * @param {string[]} stepIds
+ */
+function deleteAudioForCampaign(recipientIds, stepIds) {
+  let deleted = 0;
+  for (const recipientId of recipientIds) {
+    for (const stepId of stepIds) {
+      const filepath = getFilepath(recipientId, stepId);
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+        deleted++;
+      }
+    }
+  }
+  if (deleted > 0) {
+    logger.info('Deleted stale audio files', { deleted, recipients: recipientIds.length });
+  }
+}
+
 function getAudioUrl(recipientId, stepId, webhookBase) {
   return `${webhookBase}/api/audio/${getFilename(recipientId, stepId)}`;
 }
@@ -111,4 +134,4 @@ async function generateAudioForRecipient(recipientId, steps, vars, instructions)
   }
 }
 
-module.exports = { audioExists, getAudioUrl, generateAudio, generateAudioForRecipient };
+module.exports = { audioExists, getAudioUrl, generateAudio, generateAudioForRecipient, deleteAudioForCampaign };
