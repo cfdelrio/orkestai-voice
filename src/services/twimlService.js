@@ -215,12 +215,12 @@ async function getTwimlAfterGather(recipientId, stepId, digit, webhookBase) {
   // ─── Persist the DTMF response ────────────────────────────────────────────
   if (digit && digit.length > 0) {
     try {
-      // Find the active call for this recipient
+      // Find the most recent call for this recipient. We intentionally don't
+      // filter by status here: Twilio's completed callback can arrive before
+      // the gather POST if the network is fast, and we still want to save the
+      // response.
       const call = await prisma.call.findFirst({
-        where: {
-          recipientId,
-          status: { in: ['initiated', 'ringing', 'answered'] },
-        },
+        where: { recipientId },
         orderBy: { createdAt: 'desc' },
       });
 
