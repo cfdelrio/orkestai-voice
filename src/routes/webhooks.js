@@ -14,6 +14,7 @@
 
 const { Router } = require('express');
 const { parseWebhookEvent } = require('../providers/infobip/InfobipWebhookAdapter');
+const { parseWebhookEvent: parseTwilioEvent } = require('../providers/twilio/TwilioWebhookAdapter');
 const callService = require('../services/callService');
 const { createLogger } = require('../middleware/logger');
 
@@ -49,6 +50,43 @@ router.post('/infobip/voice', async (req, res) => {
     await callService.handleWebhookEvent(event);
   } catch (error) {
     logger.error('Error processing webhook event', {
+      error: error.message,
+      providerCallId: event.providerCallId,
+      eventType: event.eventType,
+    });
+    // Do NOT throw — we already sent 200 OK
+  }
+});
+
+/**
+ * POST /api/webhooks/twilio/voice
+ *
+ * Twilio posts call lifecycle StatusCallback events here.
+ * Twilio expects a 200 response immediately; processing happens asynchronously.
+ *
+ * Note: DTMF responses from <Gather> are handled separately by the TwiML routes
+ *       (POST /api/twiml/recipients/:recipientId/gather/:stepId) which both save
+ *       the response AND serve the next TwiML. This endpoint handles status events only.
+ */
+router.post('/twilio/voice', async (req, res) => {
+  // Always ack immediately — Twilio must not retry
+  res.status(200).send('');
+
+  const rawPayload = req.body;
+
+  logger.debug('Received Twilio voice webhook', {
+    contentType: req.headers['content-type'],
+    bodyKeys: rawPayload && typeof rawPayload === 'object' ? Object.keys(rawPayload) : [],
+  });
+
+  // Parse using the Twilio adapter
+  const event = parseTwilioEvent(rawPayload);
+
+  // Delegate handling to callService (provider-agnostic from here on)
+  try {
+    await callService.handleWebhookEvent(event);
+  } catch (error) {
+    logger.error('Error processing Twilio webhook event', {
       error: error.message,
       providerCallId: event.providerCallId,
       eventType: event.eventType,

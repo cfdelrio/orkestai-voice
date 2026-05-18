@@ -109,6 +109,7 @@ async function startCampaign(campaignId) {
         flow: campaign.flow,
         webhookUrl,
         tenantMetadata: campaign.tenant?.metadata || {},
+        recipientId: recipient.id,
       });
 
       // Persist Call record

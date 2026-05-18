@@ -19,6 +19,7 @@ const tenantsRouter = require('./routes/tenants');
 const contactsRouter = require('./routes/contacts');
 const { tenantRouter: campaignTenantRouter, campaignRouter } = require('./routes/campaigns');
 const webhooksRouter = require('./routes/webhooks');
+const twimlRouter = require('./routes/twiml');
 
 const app = express();
 const logger = createLogger('App');
@@ -61,6 +62,9 @@ app.use('/api/campaigns', campaignRouter);
 
 // Webhook receivers
 app.use('/api/webhooks', webhooksRouter);
+
+// TwiML endpoints (Twilio fetches these during calls)
+app.use('/api/twiml', twimlRouter);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

@@ -12,6 +12,7 @@
  */
 
 const InfobipVoiceProvider = require('../providers/infobip/InfobipVoiceProvider');
+const TwilioVoiceProvider = require('../providers/twilio/TwilioVoiceProvider');
 const { createLogger } = require('../middleware/logger');
 
 const logger = createLogger('ProviderFactory');
@@ -20,7 +21,7 @@ const logger = createLogger('ProviderFactory');
  * Supported provider identifiers.
  * The string values match the `provider` column in the ProviderConfig table.
  */
-const SUPPORTED_PROVIDERS = ['infobip'];
+const SUPPORTED_PROVIDERS = ['infobip', 'twilio'];
 
 /**
  * Creates and returns a VoiceProvider instance for the given config.
@@ -48,10 +49,14 @@ function createProvider(providerConfig) {
         metadata: providerConfig.metadata || {},
       });
 
+    case 'twilio':
+      return new TwilioVoiceProvider({
+        apiKey:      providerConfig.apiKey,
+        metadata:    providerConfig.metadata || {},
+        fromNumber:  providerConfig.fromNumber,
+      });
+
     // ─── Add new providers here ─────────────────────────────────────────────
-    // case 'twilio':
-    //   return new TwilioVoiceProvider({ ... });
-    //
     // case 'amazon_connect':
     //   return new AmazonConnectVoiceProvider({ ... });
     // ────────────────────────────────────────────────────────────────────────
