@@ -1,13 +1,21 @@
-import { getCampaignResults, type CampaignResults, type FlowStep } from '@/lib/api';
+import { getCampaignResults, type CampaignResults } from '@/lib/api';
+import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { CampaignActions } from './CampaignActions';
+import { CampaignCharts } from './CampaignCharts';
 
 const STATUS_COLORS: Record<string, string> = {
+  draft:      'bg-slate-100 text-slate-600',
+  running:    'bg-blue-100 text-blue-700',
+  active:     'bg-blue-100 text-blue-700',
+  paused:     'bg-amber-100 text-amber-700',
+  scheduled:  'bg-purple-100 text-purple-700',
+  completed:  'bg-green-100 text-green-700',
+  failed:     'bg-red-100 text-red-700',
   initiated:  'bg-slate-100 text-slate-600',
   ringing:    'bg-amber-100 text-amber-700',
   answered:   'bg-blue-100 text-blue-700',
-  completed:  'bg-green-100 text-green-700',
-  failed:     'bg-red-100 text-red-700',
   no_answer:  'bg-orange-100 text-orange-700',
 };
 
@@ -21,57 +29,30 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
-function StepResult({ step, answers }: { step: FlowStep; answers: Record<string, number> }) {
-  const total = Object.values(answers).reduce((a, b) => a + b, 0);
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Paso: {step.id}</p>
-      <p className="text-sm font-medium text-slate-700 mb-4">{step.text}</p>
-      <div className="space-y-2">
-        {Object.entries(answers).map(([value, count]) => {
-          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-          const label = step.options
-            ? Object.entries(step.options).find(([, v]) => v === value)?.[0]
-            : null;
-          return (
-            <div key={value}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-slate-700">
-                  {label ? `${label} — ` : ''}<span className="font-medium">{value}</span>
-                </span>
-                <span className="text-slate-500">{count} ({pct}%)</span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-indigo-500 rounded-full transition-all"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export default async function CampaignResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let data: CampaignResults;
 
+  const { getToken } = await auth();
+  const token = (await getToken()) ?? undefined;
+
+  let data: CampaignResults;
   try {
-    data = await getCampaignResults(id);
+    data = await getCampaignResults(id, token);
   } catch {
     notFound();
   }
 
   const { campaign, flow, stats } = data;
   const totalCalls = Object.values(stats.callsByStatus).reduce((a, b) => a + b, 0);
+  const answeredCalls = (stats.callsByStatus['answered'] ?? 0) + (stats.callsByStatus['completed'] ?? 0);
   const completedCalls = stats.callsByStatus['completed'] ?? 0;
-  const completionRate = totalCalls > 0 ? Math.round((completedCalls / totalCalls) * 100) : 0;
+  const answerRate = totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0;
 
-  const dtmfSteps = flow?.steps.filter((s) => s.type === 'dtmf_question') ?? [];
+  // Build step text labels for chart display
+  const stepLabels: Record<string, string> = {};
+  for (const step of flow?.steps ?? []) {
+    stepLabels[step.id] = step.text;
+  }
 
   return (
     <div>
@@ -81,63 +62,51 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
         <span className="text-slate-800 font-medium">{campaign.name}</span>
       </div>
 
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">{campaign.name}</h1>
           {campaign.description && (
             <p className="text-slate-500 mt-1">{campaign.description}</p>
           )}
+          {campaign.startedAt && (
+            <p className="text-xs text-slate-400 mt-1">
+              Iniciada: {new Date(campaign.startedAt).toLocaleString('es-AR')}
+            </p>
+          )}
+          {campaign.completedAt && (
+            <p className="text-xs text-slate-400">
+              Completada: {new Date(campaign.completedAt).toLocaleString('es-AR')}
+            </p>
+          )}
         </div>
-        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${
-          STATUS_COLORS[campaign.status] ?? 'bg-slate-100 text-slate-600'
-        }`}>
-          {campaign.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${STATUS_COLORS[campaign.status] ?? 'bg-slate-100 text-slate-600'}`}>
+            {campaign.status}
+          </span>
+          <CampaignActions campaignId={campaign.id} status={campaign.status} />
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Destinatarios" value={stats.totalRecipients} />
         <StatCard label="Llamadas totales" value={totalCalls} />
-        <StatCard label="Completadas" value={completedCalls} sub={`${completionRate}% de tasa`} />
+        <StatCard label="Completadas" value={completedCalls} sub={`${answerRate}% atendidas`} />
         <StatCard label="Fallidas" value={stats.callsByStatus['failed'] ?? 0} />
       </div>
 
-      {/* Calls by status */}
-      {totalCalls > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Llamadas por estado</h2>
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(stats.callsByStatus).map(([status, count]) => (
-              <div
-                key={status}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLORS[status] ?? 'bg-slate-100 text-slate-600'}`}
-              >
-                <span>{status}</span>
-                <span className="font-bold">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Charts */}
+      {(totalCalls > 0 || Object.keys(stats.responsesByStep).length > 0) && (
+        <CampaignCharts
+          callsByStatus={stats.callsByStatus}
+          responsesByStep={stats.responsesByStep}
+          stepLabels={stepLabels}
+        />
       )}
 
-      {/* DTMF Responses */}
-      {dtmfSteps.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">Respuestas DTMF</h2>
-          {Object.keys(stats.responsesByStep).length === 0 ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
-              Aún no hay respuestas registradas
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {dtmfSteps.map((step) => {
-                const answers = stats.responsesByStep[step.id];
-                if (!answers) return null;
-                return <StepResult key={step.id} step={step} answers={answers} />;
-              })}
-            </div>
-          )}
+      {totalCalls === 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
+          Aún no hay llamadas registradas para esta campaña
         </div>
       )}
     </div>

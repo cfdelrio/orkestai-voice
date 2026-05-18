@@ -127,4 +127,22 @@ campaignRouter.get('/:campaignId/results', asyncHandler(async (req, res) => {
   res.json(results);
 }));
 
+/**
+ * PATCH /api/campaigns/:campaignId/pause
+ * Pauses a running campaign.
+ */
+campaignRouter.patch('/:campaignId/pause', asyncHandler(async (req, res) => {
+  const result = await campaignService.pauseCampaign(req.params.campaignId);
+  res.json(result);
+}));
+
+/**
+ * PATCH /api/campaigns/:campaignId/resume
+ * Resumes a paused campaign.
+ */
+campaignRouter.patch('/:campaignId/resume', asyncHandler(async (req, res) => {
+  const result = await campaignService.resumeCampaign(req.params.campaignId);
+  res.json(result);
+}));
+
 module.exports = { tenantRouter, campaignRouter };

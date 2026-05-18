@@ -7,6 +7,7 @@ const { createLogger } = require('../middleware/logger');
 const { notFound, badRequest } = require('../middleware/errorHandler');
 const { getTenantById } = require('./tenantService');
 const { validateContactsForTenant } = require('./contactService');
+const { callQueue } = require('../queues/index');
 
 const prisma = new PrismaClient();
 const logger = createLogger('CampaignService');
@@ -297,6 +298,87 @@ async function getCampaignResults(campaignId) {
   };
 }
 
+/**
+ * Pauses a running campaign.
+ * Pending jobs remain in the queue but recipients stay as 'pending' so resume can re-enqueue.
+ * Note: jobs already picked up by the worker will still complete.
+ *
+ * @param {string} campaignId
+ */
+async function pauseCampaign(campaignId) {
+  const campaign = await getCampaignById(campaignId);
+
+  if (campaign.status !== 'running') {
+    throw badRequest(`Campaign is "${campaign.status}" — only running campaigns can be paused`);
+  }
+
+  // Drain waiting (not yet started) jobs for this campaign from the queue
+  await callQueue.pause();
+  const waiting = await callQueue.getWaiting();
+  const toRemove = waiting.filter((j) => j.data.campaignId === campaignId);
+  await Promise.all(toRemove.map((j) => j.remove()));
+  await callQueue.resume();
+
+  // Reset recipients that were re-queued but not yet picked up back to 'pending'
+  // (Worker handles idempotency — if a job was already processed, status is 'called')
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { status: 'paused' },
+  });
+
+  logger.info('Campaign paused', { campaignId, removedJobs: toRemove.length });
+
+  return { campaignId, status: 'paused', removedJobs: toRemove.length };
+}
+
+/**
+ * Resumes a paused campaign by re-enqueueing all pending recipients.
+ *
+ * @param {string} campaignId
+ */
+async function resumeCampaign(campaignId) {
+  const campaign = await getCampaignById(campaignId);
+
+  if (campaign.status !== 'paused') {
+    throw badRequest(`Campaign is "${campaign.status}" — only paused campaigns can be resumed`);
+  }
+
+  const pendingRecipients = await prisma.campaignRecipient.findMany({
+    where: { campaignId, status: 'pending' },
+    include: { contact: true },
+  });
+
+  if (pendingRecipients.length === 0) {
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'completed', completedAt: new Date() },
+    });
+    return { campaignId, status: 'completed', enqueued: 0 };
+  }
+
+  const jobs = pendingRecipients.map((r) => ({
+    name: 'initiate-call',
+    data: {
+      campaignId,
+      recipientId: r.id,
+      tenantId: campaign.tenantId,
+      contactId: r.contact.id,
+      phone: r.contact.phone,
+    },
+  }));
+
+  await callQueue.addBulk(jobs);
+
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { status: 'running' },
+  });
+
+  logger.info('Campaign resumed', { campaignId, enqueued: jobs.length });
+
+  return { campaignId, status: 'running', enqueued: jobs.length };
+}
+
 module.exports = {
   createCampaign,
   listCampaigns,
@@ -305,4 +387,6 @@ module.exports = {
   setFlow,
   addRecipients,
   getCampaignResults,
+  pauseCampaign,
+  resumeCampaign,
 };

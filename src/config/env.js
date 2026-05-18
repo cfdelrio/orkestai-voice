@@ -16,6 +16,14 @@ const config = {
     baseUrl: process.env.WEBHOOK_BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
   },
 
+  redis: {
+    url: process.env.REDIS_URL,
+  },
+
+  clerk: {
+    secretKey: process.env.CLERK_SECRET_KEY,
+  },
+
   nodeEnv: process.env.NODE_ENV || 'development',
 };
 

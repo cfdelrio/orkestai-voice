@@ -2,16 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import {
   createCampaign,
   setFlow,
   addRecipients,
   startCampaign,
   listContacts,
-  DEFAULT_TENANT_ID,
   type FlowStep,
   type Contact,
 } from '@/lib/api';
+import { useTenant } from '@/app/providers';
 import Link from 'next/link';
 
 type Step = 'info' | 'flow' | 'contacts' | 'start';
@@ -31,6 +32,9 @@ const EMPTY_FLOW_STEP = (): FlowStep => ({
 
 export default function NewCampaignPage() {
   const router = useRouter();
+  const { getToken } = useAuth();
+  const { tenantId } = useTenant();
+
   const [step, setStep] = useState<Step>('info');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +62,8 @@ export default function NewCampaignPage() {
     if (!name.trim()) { setError('El nombre es requerido'); return; }
     setLoading(true); setError(null);
     try {
-      const res = await createCampaign(DEFAULT_TENANT_ID, { name: name.trim(), description: description.trim() || undefined });
+      const token = (await getToken()) ?? undefined;
+      const res = await createCampaign(tenantId, { name: name.trim(), description: description.trim() || undefined }, token);
       setCampaignId(res.campaign.id);
       setStep('flow');
     } catch (e) { setError((e as Error).message); }
@@ -71,9 +76,10 @@ export default function NewCampaignPage() {
     if (invalid) { setError('Todos los pasos necesitan texto'); return; }
     setLoading(true); setError(null);
     try {
-      await setFlow(campaignId, flowSteps);
+      const token = (await getToken()) ?? undefined;
+      await setFlow(campaignId, flowSteps, token);
       if (!contactsLoaded) {
-        const res = await listContacts(DEFAULT_TENANT_ID);
+        const res = await listContacts(tenantId, token);
         setContacts(res.contacts);
         setContactsLoaded(true);
       }
@@ -87,7 +93,8 @@ export default function NewCampaignPage() {
     if (selectedIds.size === 0) { setError('Seleccioná al menos un contacto'); return; }
     setLoading(true); setError(null);
     try {
-      await addRecipients(campaignId, Array.from(selectedIds));
+      const token = (await getToken()) ?? undefined;
+      await addRecipients(campaignId, Array.from(selectedIds), token);
       setStep('start');
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
@@ -97,7 +104,8 @@ export default function NewCampaignPage() {
     if (!campaignId) return;
     setLoading(true); setError(null);
     try {
-      await startCampaign(campaignId);
+      const token = (await getToken()) ?? undefined;
+      await startCampaign(campaignId, token);
       router.push(`/campaigns/${campaignId}`);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }

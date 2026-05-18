@@ -15,11 +15,13 @@
 const express = require('express');
 const { createLogger } = require('./middleware/logger');
 const { errorHandler } = require('./middleware/errorHandler');
+const { requireAuth } = require('./middleware/auth');
 const tenantsRouter = require('./routes/tenants');
 const contactsRouter = require('./routes/contacts');
 const { tenantRouter: campaignTenantRouter, campaignRouter } = require('./routes/campaigns');
 const webhooksRouter = require('./routes/webhooks');
 const twimlRouter = require('./routes/twiml');
+const usersRouter = require('./routes/users');
 
 const app = express();
 const logger = createLogger('App');
@@ -46,7 +48,13 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// ─── Auth middleware (applies to all /api/* except webhooks, twiml, and slug lookup) ──
+app.use('/api', requireAuth);
+
 // ─── API routes ────────────────────────────────────────────────────────────────
+
+// User management
+app.use('/api/users', usersRouter);
 
 // Tenant management
 app.use('/api/tenants', tenantsRouter);

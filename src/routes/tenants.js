@@ -48,6 +48,18 @@ router.get('/', asyncHandler(async (_req, res) => {
 }));
 
 /**
+ * GET /api/tenants/slug/:slug
+ * Returns a tenant by slug (public — used by frontend middleware for subdomain resolution).
+ */
+router.get('/slug/:slug', asyncHandler(async (req, res) => {
+  const tenant = await tenantService.getTenantBySlug(req.params.slug);
+  if (!tenant) {
+    return res.status(404).json({ error: { message: `Tenant not found for slug: ${req.params.slug}` } });
+  }
+  res.json({ tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug } });
+}));
+
+/**
  * GET /api/tenants/:tenantId
  * Returns a single tenant by ID.
  */
