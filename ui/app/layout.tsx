@@ -2,10 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 import Link from 'next/link';
 import { headers } from 'next/headers';
-import { auth } from '@clerk/nextjs/server';
 import { ClerkProvider, Show, UserButton, SignInButton } from '@clerk/nextjs';
 import Providers from './providers';
-import { linkUser } from '@/lib/api';
 
 export const metadata: Metadata = {
   title: 'Orkestai Voice',
@@ -16,16 +14,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const headersList = await headers();
   const tenantId = headersList.get('x-tenant-id') ?? process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID ?? '';
   const tenantSlug = headersList.get('x-tenant-slug') ?? '';
-
-  if (tenantId) {
-    try {
-      const { getToken } = await auth();
-      const token = await getToken();
-      if (token) await linkUser(tenantId, 'owner', token);
-    } catch {
-      // Usuario no autenticado o error de red — se ignora
-    }
-  }
 
   return (
     <html lang="es">

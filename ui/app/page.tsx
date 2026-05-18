@@ -1,4 +1,4 @@
-import { listCampaigns, type Campaign } from '@/lib/api';
+import { listCampaigns, linkUser, type Campaign } from '@/lib/api';
 import { auth } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import Link from 'next/link';
@@ -48,6 +48,11 @@ export default async function CampaignsPage() {
 
   const { getToken } = await auth();
   const token = (await getToken()) ?? undefined;
+
+  // Vincular usuario al tenant en el primer acceso (idempotente)
+  if (tenantId && token) {
+    try { await linkUser(tenantId, 'owner', token); } catch { /* ya vinculado o sin tenant */ }
+  }
 
   let campaigns: Campaign[] = [];
   let error: string | null = null;
