@@ -159,6 +159,26 @@ async function getProviderConfigForTenant(tenantId) {
   return config;
 }
 
+async function upsertProviderConfig(tenantId, { provider, apiKey, baseUrl, fromNumber, metadata = {} }) {
+  await getTenantById(tenantId);
+
+  if (!SUPPORTED_PROVIDERS.includes(provider)) {
+    throw badRequest(`Unsupported provider "${provider}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}`);
+  }
+
+  const existing = await prisma.providerConfig.findFirst({ where: { tenantId } });
+
+  logger.info(`Upserting provider config`, { tenantId, provider, existing: !!existing });
+
+  const data = { provider, apiKey, baseUrl, fromNumber, metadata };
+
+  const config = existing
+    ? await prisma.providerConfig.update({ where: { id: existing.id }, data })
+    : await prisma.providerConfig.create({ data: { tenantId, ...data } });
+
+  return config;
+}
+
 module.exports = {
   createTenant,
   listTenants,
@@ -166,4 +186,5 @@ module.exports = {
   getTenantBySlug,
   createProviderConfig,
   getProviderConfigForTenant,
+  upsertProviderConfig,
 };

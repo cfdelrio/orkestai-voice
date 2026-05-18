@@ -36,6 +36,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/analytics" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
                 Analytics
               </Link>
+              <Link href="/settings" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">
+                Configuración
+              </Link>
               <div className="ml-auto flex items-center gap-3">
                 {tenantSlug && (
                   <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
