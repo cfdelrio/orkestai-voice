@@ -1,0 +1,43 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+      - claude/multi-tenant-phone-campaigns-tMD0m
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GITHUB_REF_NAME
+          script: |
+            set -e
+
+            cd /opt/orkestai-voice
+
+            # Pull latest code
+            sudo -u orkestai git fetch origin
+            sudo -u orkestai git checkout "$GITHUB_REF_NAME"
+            sudo -u orkestai git pull origin "$GITHUB_REF_NAME"
+
+            # Backend dependencies
+            sudo -u orkestai npm ci
+
+            # Frontend dependencies + build
+            sudo -u orkestai bash -c "cd /opt/orkestai-voice/ui && npm ci && npm run build"
+
+            # Restart all PM2 processes
+            sudo -u orkestai pm2 startOrRestart /opt/orkestai-voice/ecosystem.config.js --env production
+            sudo -u orkestai pm2 save
+
+            echo "Deploy complete"
