@@ -360,6 +360,7 @@ async function getCampaignResults(campaignId) {
       startedAt: campaign.startedAt,
       completedAt: campaign.completedAt,
       variables: campaign.variables,
+      metadata: campaign.metadata,
       createdAt: campaign.createdAt,
       updatedAt: campaign.updatedAt,
     },
