@@ -27,7 +27,7 @@ const tenantRouter = Router({ mergeParams: true });
  */
 tenantRouter.post('/', asyncHandler(async (req, res) => {
   const { tenantId } = req.params;
-  const { name, description, variables, voiceInstructions, voice, metadata } = req.body;
+  const { name, description, variables, voiceInstructions, voice, ttsProvider, elevenLabsVoiceId, metadata } = req.body;
 
   if (!name || typeof name !== 'string') {
     throw badRequest('"name" is required');
@@ -39,6 +39,8 @@ tenantRouter.post('/', asyncHandler(async (req, res) => {
     variables: variables && typeof variables === 'object' ? variables : {},
     voiceInstructions: typeof voiceInstructions === 'string' ? voiceInstructions : undefined,
     voice: typeof voice === 'string' ? voice : undefined,
+    ttsProvider: typeof ttsProvider === 'string' ? ttsProvider : undefined,
+    elevenLabsVoiceId: typeof elevenLabsVoiceId === 'string' ? elevenLabsVoiceId : undefined,
     metadata: metadata || {},
   });
 
@@ -157,11 +159,13 @@ campaignRouter.patch('/:campaignId/resume', asyncHandler(async (req, res) => {
  */
 campaignRouter.patch('/:campaignId', asyncHandler(async (req, res) => {
   const { campaignId } = req.params;
-  const { voiceInstructions, voice, variables } = req.body;
+  const { voiceInstructions, voice, ttsProvider, elevenLabsVoiceId, variables } = req.body;
 
   const campaign = await campaignService.updateCampaign(campaignId, {
     voiceInstructions: typeof voiceInstructions === 'string' ? voiceInstructions : undefined,
     voice: typeof voice === 'string' ? voice : undefined,
+    ttsProvider: typeof ttsProvider === 'string' ? ttsProvider : undefined,
+    elevenLabsVoiceId: typeof elevenLabsVoiceId === 'string' ? elevenLabsVoiceId : undefined,
     variables: variables && typeof variables === 'object' ? variables : undefined,
   });
 

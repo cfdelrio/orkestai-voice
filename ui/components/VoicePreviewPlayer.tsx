@@ -7,9 +7,11 @@ interface Props {
   voiceInstructions?: string;
   voice?: string;
   defaultText?: string;
+  ttsProvider?: string;
+  elevenLabsVoiceId?: string;
 }
 
-export function VoicePreviewPlayer({ voiceInstructions, voice, defaultText = 'Hola María, gracias por atender.' }: Props) {
+export function VoicePreviewPlayer({ voiceInstructions, voice, defaultText = 'Hola María, gracias por atender.', ttsProvider, elevenLabsVoiceId }: Props) {
   const [text, setText] = useState(defaultText);
 
   // Keep in sync when the parent step text changes
@@ -41,7 +43,7 @@ export function VoicePreviewPlayer({ voiceInstructions, voice, defaultText = 'Ho
     setError('');
     try {
       if (prevBlobUrl.current) URL.revokeObjectURL(prevBlobUrl.current);
-      const url = await previewAudio(text.trim(), voiceInstructions || undefined, voice || undefined);
+      const url = await previewAudio(text.trim(), voiceInstructions || undefined, voice || undefined, ttsProvider || undefined, elevenLabsVoiceId || undefined);
       prevBlobUrl.current = url;
       setAudioUrl(url);
     } catch (err: unknown) {

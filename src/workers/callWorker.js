@@ -56,9 +56,11 @@ async function processCallJob(job) {
     const voiceInstructions = campaign.tenant?.metadata?.voiceInstructions
       || campaign.metadata?.voiceInstructions
       || undefined;
-    const voice = campaign.metadata?.voice || undefined;
+    const voice              = campaign.metadata?.voice              || undefined;
+    const ttsProvider        = campaign.metadata?.ttsProvider        || 'openai';
+    const elevenLabsVoiceId  = campaign.metadata?.elevenLabsVoiceId  || undefined;
     try {
-      await generateAudioForRecipient(recipientId, campaign.flow.steps, vars, voiceInstructions, voice);
+      await generateAudioForRecipient(recipientId, campaign.flow.steps, vars, voiceInstructions, voice, ttsProvider, elevenLabsVoiceId);
     } catch (audioErr) {
       // Non-fatal: fall back to <Say> in TwiML if audio generation fails
       logger.warn('Audio pre-generation failed — will use Say fallback', {

@@ -1,11 +1,8 @@
 /**
- * @fileoverview Audio generation service using OpenAI TTS.
+ * @fileoverview Audio generation service — OpenAI TTS and ElevenLabs TTS.
  *
- * Generates MP3 files from text using OpenAI's tts-1-hd model (voice: nova).
- * Files are named {recipientId}-{stepId}.mp3 and cached on disk — if the file
- * already exists, generation is skipped.
- *
- * Audio files are served publicly via GET /api/audio/:filename.
+ * Files are named {recipientId}-{stepId}.mp3 and cached on disk.
+ * Provider is selected per campaign via metadata.ttsProvider ('openai' | 'elevenlabs').
  */
 
 const OpenAI = require('openai');
@@ -19,16 +16,20 @@ const prisma = new PrismaClient();
 
 const AUDIO_DIR = path.join(process.cwd(), 'audio');
 const RECORDINGS_DIR = path.join(process.cwd(), 'recordings');
-const VOICE_DEFAULT = 'nova';
-const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
-function resolveVoice(voice) {
-  return VALID_VOICES.includes(voice) ? voice : VOICE_DEFAULT;
-}
-// gpt-4o-mini-tts supports the `instructions` param for style/accent control
+// OpenAI
+const OPENAI_VOICE_DEFAULT = 'nova';
+const OPENAI_VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 const MODEL_WITH_INSTRUCTIONS = 'gpt-4o-mini-tts';
-// tts-1-hd is the fallback when no instructions are provided
 const MODEL_DEFAULT = 'tts-1-hd';
+
+// ElevenLabs
+const ELEVENLABS_API = 'https://api.elevenlabs.io/v1';
+const ELEVENLABS_MODEL = 'eleven_multilingual_v2';
+
+function resolveOpenAIVoice(voice) {
+  return OPENAI_VALID_VOICES.includes(voice) ? voice : OPENAI_VOICE_DEFAULT;
+}
 
 function getFilename(recipientId, stepId) {
   return `${recipientId}-${stepId}.mp3`;
@@ -42,13 +43,10 @@ function audioExists(recipientId, stepId) {
   return fs.existsSync(getFilepath(recipientId, stepId));
 }
 
-/**
- * Deletes all pre-generated audio files for every recipient of a campaign.
- * Called when the flow is updated so stale audio doesn't get served.
- *
- * @param {string[]} recipientIds
- * @param {string[]} stepIds
- */
+function getAudioUrl(recipientId, stepId, webhookBase) {
+  return `${webhookBase}/api/audio/${getFilename(recipientId, stepId)}`;
+}
+
 function deleteAudioForCampaign(recipientIds, stepIds) {
   let deleted = 0;
   for (const recipientId of recipientIds) {
@@ -65,21 +63,101 @@ function deleteAudioForCampaign(recipientIds, stepIds) {
   }
 }
 
-function getAudioUrl(recipientId, stepId, webhookBase) {
-  return `${webhookBase}/api/audio/${getFilename(recipientId, stepId)}`;
+// ─── OpenAI TTS ───────────────────────────────────────────────────────────────
+
+async function generateAudioOpenAI(filepath, text, instructions, voice) {
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn('OPENAI_API_KEY not set — skipping OpenAI TTS');
+    return;
+  }
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const model = instructions ? MODEL_WITH_INSTRUCTIONS : MODEL_DEFAULT;
+  const resolvedVoice = resolveOpenAIVoice(voice);
+
+  logger.info('OpenAI TTS', { chars: text.length, model, voice: resolvedVoice });
+
+  const params = { model, voice: resolvedVoice, input: text, response_format: 'mp3' };
+  if (instructions) params.instructions = instructions;
+
+  const response = await openai.audio.speech.create(params);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(filepath, buffer);
+  logger.info('OpenAI TTS saved', { bytes: buffer.length });
+}
+
+// ─── ElevenLabs TTS ───────────────────────────────────────────────────────────
+
+async function generateAudioElevenLabs(filepath, text, voiceId) {
+  if (!process.env.ELEVENLABS_API_KEY) {
+    logger.warn('ELEVENLABS_API_KEY not set — skipping ElevenLabs TTS');
+    return;
+  }
+  if (!voiceId) {
+    logger.warn('No ElevenLabs voiceId configured — skipping');
+    return;
+  }
+
+  logger.info('ElevenLabs TTS', { chars: text.length, voiceId });
+
+  const res = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': process.env.ELEVENLABS_API_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'audio/mpeg',
+    },
+    body: JSON.stringify({
+      text,
+      model_id: ELEVENLABS_MODEL,
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true },
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`ElevenLabs TTS error ${res.status}: ${detail}`);
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  fs.writeFileSync(filepath, buffer);
+  logger.info('ElevenLabs TTS saved', { bytes: buffer.length });
 }
 
 /**
- * Generates an MP3 for a single step text using OpenAI TTS.
- * Skips generation if the file already exists (idempotent).
+ * Returns the list of voices from ElevenLabs (including cloned voices).
+ */
+async function getElevenLabsVoices() {
+  if (!process.env.ELEVENLABS_API_KEY) return [];
+
+  const res = await fetch(`${ELEVENLABS_API}/voices`, {
+    headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
+  });
+  if (!res.ok) throw new Error(`ElevenLabs voices error ${res.status}`);
+
+  const data = await res.json();
+  return (data.voices ?? []).map((v) => ({
+    voiceId: v.voice_id,
+    name: v.name,
+    category: v.category, // 'premade' | 'cloned' | 'generated'
+    previewUrl: v.preview_url ?? null,
+  }));
+}
+
+// ─── Unified entry point ──────────────────────────────────────────────────────
+
+/**
+ * Generates an MP3 for a single flow step. Skips if already cached.
+ * Dispatches to OpenAI or ElevenLabs based on ttsProvider.
  *
  * @param {string} recipientId
  * @param {string} stepId
- * @param {string} text         - Already interpolated plain text
- * @param {string} [instructions] - Voice style instructions (accent, tone, pace)
- * @param {string} [voice]        - OpenAI voice ID (alloy, echo, fable, onyx, nova, shimmer)
+ * @param {string} text
+ * @param {string} [instructions]       - Voice instructions (OpenAI only)
+ * @param {string} [voice]              - OpenAI voice ID
+ * @param {string} [ttsProvider]        - 'openai' | 'elevenlabs' (default: 'openai')
+ * @param {string} [elevenLabsVoiceId]  - ElevenLabs voice ID
  */
-async function generateAudio(recipientId, stepId, text, instructions, voice) {
+async function generateAudio(recipientId, stepId, text, instructions, voice, ttsProvider, elevenLabsVoiceId) {
   const filepath = getFilepath(recipientId, stepId);
 
   if (fs.existsSync(filepath)) {
@@ -87,51 +165,25 @@ async function generateAudio(recipientId, stepId, text, instructions, voice) {
     return;
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    logger.warn('OPENAI_API_KEY not set — skipping audio generation');
-    return;
-  }
-
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const model = instructions ? MODEL_WITH_INSTRUCTIONS : MODEL_DEFAULT;
-  const resolvedVoice = resolveVoice(voice);
-  logger.info('Generating audio', { recipientId, stepId, chars: text.length, model, voice: resolvedVoice, hasInstructions: !!instructions });
-
-  const params = {
-    model,
-    voice: resolvedVoice,
-    input: text,
-    response_format: 'mp3',
-  };
-  if (instructions) params.instructions = instructions;
-
-  const response = await openai.audio.speech.create(params);
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(filepath, buffer);
-
-  logger.info('Audio saved', { recipientId, stepId, bytes: buffer.length });
+  if (ttsProvider === 'elevenlabs') {
+    await generateAudioElevenLabs(filepath, text, elevenLabsVoiceId);
+  } else {
+    await generateAudioOpenAI(filepath, text, instructions, voice);
+  }
 }
 
 /**
- * Generates audio for all steps of a recipient's campaign flow.
- *
- * @param {string} recipientId
- * @param {Array<{id: string, text: string, type: string}>} steps
- * @param {Record<string, string>} vars         - Template variables for this contact
- * @param {string}                [instructions] - Voice style instructions
- * @param {string}                [voice]        - OpenAI voice ID
+ * Generates audio for all steps of a recipient.
  */
-async function generateAudioForRecipient(recipientId, steps, vars, instructions, voice) {
+async function generateAudioForRecipient(recipientId, steps, vars, instructions, voice, ttsProvider, elevenLabsVoiceId) {
   const { interpolateTemplate } = require('./templateEngine');
 
   const results = await Promise.allSettled(
     steps.map((step) => {
       const text = interpolateTemplate(step.text || '', vars);
-      return generateAudio(recipientId, step.id, text, instructions, voice);
+      return generateAudio(recipientId, step.id, text, instructions, voice, ttsProvider, elevenLabsVoiceId);
     })
   );
 
@@ -145,16 +197,8 @@ async function generateAudioForRecipient(recipientId, steps, vars, instructions,
   }
 }
 
-/**
- * Downloads a Twilio voice recording, transcribes it with OpenAI Whisper,
- * and updates the Response record with the transcript text.
- * Saves the MP3 to disk at recordings/{responseId}.mp3.
- *
- * @param {string} recordingUrl - Twilio recording URL (no extension)
- * @param {string} responseId   - Response record ID to update
- * @param {string} accountSid   - Twilio Account SID for Basic Auth download
- * @param {string} authToken    - Twilio Auth Token for Basic Auth download
- */
+// ─── Whisper transcription (for speech_question steps) ────────────────────────
+
 async function transcribeAndSaveRecording(recordingUrl, responseId, accountSid, authToken) {
   if (!process.env.OPENAI_API_KEY) {
     logger.warn('OPENAI_API_KEY not set — skipping transcription', { responseId });
@@ -167,7 +211,6 @@ async function transcribeAndSaveRecording(recordingUrl, responseId, accountSid, 
   const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
   const filepath = path.join(RECORDINGS_DIR, `${responseId}.mp3`);
 
-  // Retry download up to 3 times — Twilio sometimes takes a few seconds to make the file available
   const RETRY_DELAYS = [0, 10000, 20000];
   let downloadedOk = false;
 
@@ -214,4 +257,12 @@ async function transcribeAndSaveRecording(recordingUrl, responseId, accountSid, 
   }
 }
 
-module.exports = { audioExists, getAudioUrl, generateAudio, generateAudioForRecipient, deleteAudioForCampaign, transcribeAndSaveRecording };
+module.exports = {
+  audioExists,
+  getAudioUrl,
+  generateAudio,
+  generateAudioForRecipient,
+  deleteAudioForCampaign,
+  transcribeAndSaveRecording,
+  getElevenLabsVoices,
+};

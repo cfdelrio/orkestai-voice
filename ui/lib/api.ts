@@ -104,7 +104,7 @@ export const listContacts = (tenantId: string, token?: string) =>
 
 export const createCampaign = (
   tenantId: string,
-  data: { name: string; description?: string; variables?: Record<string, string>; voiceInstructions?: string; voice?: string },
+  data: { name: string; description?: string; variables?: Record<string, string>; voiceInstructions?: string; voice?: string; ttsProvider?: string; elevenLabsVoiceId?: string },
   token?: string,
 ) =>
   apiFetch<{ campaign: Campaign }>(`/api/tenants/${tenantId}/campaigns`, {
@@ -129,7 +129,7 @@ export const startCampaign = (campaignId: string, token?: string) =>
 
 export const updateCampaign = (
   campaignId: string,
-  data: { voiceInstructions?: string; voice?: string; variables?: Record<string, string> },
+  data: { voiceInstructions?: string; voice?: string; ttsProvider?: string; elevenLabsVoiceId?: string; variables?: Record<string, string> },
   token?: string,
 ) =>
   apiFetch<{ campaign: Campaign }>(`/api/campaigns/${campaignId}`, {
@@ -165,12 +165,26 @@ export const deleteContact = (tenantId: string, contactId: string, token?: strin
  * Generates a TTS preview and returns a blob URL suitable for <audio src>.
  * The caller is responsible for calling URL.revokeObjectURL() when done.
  */
-export async function previewAudio(text: string, voiceInstructions?: string, voice?: string): Promise<string> {
+export async function getElevenLabsVoices(): Promise<{ voiceId: string; name: string; category: string; previewUrl: string | null }[]> {
+  const url = `${typeof window === 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')}/api/audio/elevenlabs-voices`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch ElevenLabs voices');
+  const data = await res.json();
+  return data.voices;
+}
+
+export async function previewAudio(
+  text: string,
+  voiceInstructions?: string,
+  voice?: string,
+  ttsProvider?: string,
+  elevenLabsVoiceId?: string,
+): Promise<string> {
   const url = `${typeof window === 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')}/api/audio/preview`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voiceInstructions, voice }),
+    body: JSON.stringify({ text, voiceInstructions, voice, ttsProvider, elevenLabsVoiceId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
