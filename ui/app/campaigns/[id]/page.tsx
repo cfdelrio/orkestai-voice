@@ -157,7 +157,6 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
         campaignId={campaign.id}
         initialInstructions={String(campaign.metadata?.voiceInstructions ?? '')}
         initialVoice={String(campaign.metadata?.voice ?? 'nova')}
-        token={token}
       />
 
       {/* Stats */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { updateCampaign } from '@/lib/api';
 import { VoicePreviewPlayer } from '@/components/VoicePreviewPlayer';
 
@@ -17,10 +18,10 @@ interface Props {
   campaignId: string;
   initialInstructions: string;
   initialVoice?: string;
-  token?: string;
 }
 
-export function VoiceInstructionsEditor({ campaignId, initialInstructions, initialVoice = 'nova', token }: Props) {
+export function VoiceInstructionsEditor({ campaignId, initialInstructions, initialVoice = 'nova' }: Props) {
+  const { getToken } = useAuth();
   const [open, setOpen] = useState(false);
   const [instructions, setInstructions] = useState(initialInstructions);
   const [voice, setVoice] = useState(initialVoice);
@@ -32,6 +33,7 @@ export function VoiceInstructionsEditor({ campaignId, initialInstructions, initi
     setSaving(true);
     setSaved(false);
     try {
+      const token = (await getToken()) ?? undefined;
       await updateCampaign(campaignId, { voiceInstructions: instructions, voice }, token);
       setSaved(true);
       setSaveError('');
