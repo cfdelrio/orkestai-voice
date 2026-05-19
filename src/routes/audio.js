@@ -1,17 +1,61 @@
 /**
- * @fileoverview Serves pre-generated TTS audio files for Twilio <Play>.
+ * @fileoverview Audio routes.
  *
- * GET /api/audio/:filename
- *   Returns the MP3 file. No auth required — Twilio fetches these during calls.
- *   Filename must match the pattern {uuid}-{stepId}.mp3 to prevent path traversal.
+ * GET  /api/audio/:filename   — Serves pre-generated TTS MP3s for Twilio <Play>.
+ * POST /api/audio/preview     — Generates and streams a TTS preview (no file saved).
  */
 
 const { Router } = require('express');
 const fs = require('fs');
 const path = require('path');
+const OpenAI = require('openai');
+const { createLogger } = require('../middleware/logger');
 
 const router = Router();
+const logger = createLogger('AudioRoute');
 const AUDIO_DIR = path.join(process.cwd(), 'audio');
+
+/**
+ * POST /api/audio/preview
+ *
+ * Generates a TTS audio preview and streams the MP3 directly to the browser.
+ * Nothing is saved to disk — each call generates fresh audio.
+ *
+ * Body: { text: string, voiceInstructions?: string }
+ * Response: audio/mpeg
+ */
+router.post('/preview', async (req, res) => {
+  const { text, voiceInstructions } = req.body ?? {};
+
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: '"text" is required' });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'TTS not configured (OPENAI_API_KEY missing)' });
+  }
+
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const model = voiceInstructions ? 'gpt-4o-mini-tts' : 'tts-1-hd';
+
+    logger.info('Generating preview audio', { chars: text.trim().length, model, hasInstructions: !!voiceInstructions });
+
+    const params = { model, voice: 'nova', input: text.trim(), response_format: 'mp3' };
+    if (voiceInstructions) params.instructions = voiceInstructions;
+
+    const ttsResponse = await openai.audio.speech.create(params);
+    const buffer = Buffer.from(await ttsResponse.arrayBuffer());
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buffer);
+  } catch (err) {
+    logger.error('Preview audio generation failed', { error: err.message });
+    res.status(500).json({ error: 'Failed to generate preview audio' });
+  }
+});
 
 router.get('/:filename', (req, res) => {
   const { filename } = req.params;
