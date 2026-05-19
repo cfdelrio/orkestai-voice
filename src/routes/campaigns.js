@@ -27,7 +27,7 @@ const tenantRouter = Router({ mergeParams: true });
  */
 tenantRouter.post('/', asyncHandler(async (req, res) => {
   const { tenantId } = req.params;
-  const { name, description, variables, voiceInstructions, metadata } = req.body;
+  const { name, description, variables, voiceInstructions, voice, metadata } = req.body;
 
   if (!name || typeof name !== 'string') {
     throw badRequest('"name" is required');
@@ -38,6 +38,7 @@ tenantRouter.post('/', asyncHandler(async (req, res) => {
     description: description || null,
     variables: variables && typeof variables === 'object' ? variables : {},
     voiceInstructions: typeof voiceInstructions === 'string' ? voiceInstructions : undefined,
+    voice: typeof voice === 'string' ? voice : undefined,
     metadata: metadata || {},
   });
 
@@ -156,10 +157,11 @@ campaignRouter.patch('/:campaignId/resume', asyncHandler(async (req, res) => {
  */
 campaignRouter.patch('/:campaignId', asyncHandler(async (req, res) => {
   const { campaignId } = req.params;
-  const { voiceInstructions, variables } = req.body;
+  const { voiceInstructions, voice, variables } = req.body;
 
   const campaign = await campaignService.updateCampaign(campaignId, {
     voiceInstructions: typeof voiceInstructions === 'string' ? voiceInstructions : undefined,
+    voice: typeof voice === 'string' ? voice : undefined,
     variables: variables && typeof variables === 'object' ? variables : undefined,
   });
 

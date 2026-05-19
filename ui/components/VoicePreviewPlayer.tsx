@@ -5,10 +5,11 @@ import { previewAudio } from '@/lib/api';
 
 interface Props {
   voiceInstructions?: string;
+  voice?: string;
   defaultText?: string;
 }
 
-export function VoicePreviewPlayer({ voiceInstructions, defaultText = 'Hola María, gracias por atender.' }: Props) {
+export function VoicePreviewPlayer({ voiceInstructions, voice, defaultText = 'Hola María, gracias por atender.' }: Props) {
   const [text, setText] = useState(defaultText);
 
   // Keep in sync when the parent step text changes
@@ -40,7 +41,7 @@ export function VoicePreviewPlayer({ voiceInstructions, defaultText = 'Hola Mar�
     setError('');
     try {
       if (prevBlobUrl.current) URL.revokeObjectURL(prevBlobUrl.current);
-      const url = await previewAudio(text.trim(), voiceInstructions || undefined);
+      const url = await previewAudio(text.trim(), voiceInstructions || undefined, voice || undefined);
       prevBlobUrl.current = url;
       setAudioUrl(url);
     } catch (err: unknown) {

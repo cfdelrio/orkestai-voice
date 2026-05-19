@@ -28,7 +28,9 @@ const VALID_STEP_TYPES = ['say', 'dtmf_question', 'speech_question', 'goodbye'];
  * @param {Object} [data.metadata]
  * @returns {Promise<Object>} Created campaign record
  */
-async function createCampaign(tenantId, { name, description, variables = {}, voiceInstructions, metadata = {} }) {
+const VALID_OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+
+async function createCampaign(tenantId, { name, description, variables = {}, voiceInstructions, voice, metadata = {} }) {
   await getTenantById(tenantId);
 
   if (!name || !name.trim()) {
@@ -37,9 +39,9 @@ async function createCampaign(tenantId, { name, description, variables = {}, voi
 
   logger.info(`Creating campaign`, { tenantId, name });
 
-  const resolvedMetadata = voiceInstructions
-    ? { ...metadata, voiceInstructions: voiceInstructions.trim() }
-    : metadata;
+  const resolvedMetadata = { ...metadata };
+  if (voiceInstructions) resolvedMetadata.voiceInstructions = voiceInstructions.trim();
+  if (voice && VALID_OPENAI_VOICES.includes(voice)) resolvedMetadata.voice = voice;
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -67,7 +69,7 @@ async function createCampaign(tenantId, { name, description, variables = {}, voi
  * @param {Object} [data.variables]
  * @returns {Promise<Object>} Updated campaign record
  */
-async function updateCampaign(campaignId, { voiceInstructions, variables }) {
+async function updateCampaign(campaignId, { voiceInstructions, voice, variables }) {
   const campaign = await getCampaignById(campaignId);
 
   const updateData = {};
@@ -76,9 +78,12 @@ async function updateCampaign(campaignId, { voiceInstructions, variables }) {
     updateData.variables = variables;
   }
 
-  if (voiceInstructions !== undefined) {
+  const voiceChanged = voiceInstructions !== undefined || (voice !== undefined && VALID_OPENAI_VOICES.includes(voice));
+  if (voiceChanged) {
     const currentMeta = (campaign.metadata && typeof campaign.metadata === 'object') ? campaign.metadata : {};
-    updateData.metadata = { ...currentMeta, voiceInstructions: voiceInstructions.trim() };
+    updateData.metadata = { ...currentMeta };
+    if (voiceInstructions !== undefined) updateData.metadata.voiceInstructions = voiceInstructions.trim();
+    if (voice && VALID_OPENAI_VOICES.includes(voice)) updateData.metadata.voice = voice;
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -90,8 +95,8 @@ async function updateCampaign(campaignId, { voiceInstructions, variables }) {
     data: updateData,
   });
 
-  // Clear audio cache so next call regenerates with new instructions
-  if (voiceInstructions !== undefined && campaign.flow?.steps) {
+  // Clear audio cache so next call regenerates with new voice/instructions
+  if (voiceChanged && campaign.flow?.steps) {
     const recipients = await prisma.campaignRecipient.findMany({
       where: { campaignId },
       select: { id: true },
