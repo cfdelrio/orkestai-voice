@@ -26,6 +26,7 @@ export function VoiceInstructionsEditor({ campaignId, initialInstructions, initi
   const [voice, setVoice] = useState(initialVoice);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   async function handleSave() {
     setSaving(true);
@@ -33,10 +34,11 @@ export function VoiceInstructionsEditor({ campaignId, initialInstructions, initi
     try {
       await updateCampaign(campaignId, { voiceInstructions: instructions, voice }, token);
       setSaved(true);
+      setSaveError('');
       setOpen(false);
       setTimeout(() => setSaved(false), 3000);
-    } catch {
-      alert('Error al guardar la configuración de voz');
+    } catch (e) {
+      setSaveError((e as Error).message ?? 'Error al guardar');
     } finally {
       setSaving(false);
     }
@@ -90,6 +92,9 @@ export function VoiceInstructionsEditor({ campaignId, initialInstructions, initi
 
           <VoicePreviewPlayer voiceInstructions={instructions} voice={voice} />
 
+          {saveError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{saveError}</p>
+          )}
           <div className="flex justify-end">
             <button
               onClick={handleSave}
