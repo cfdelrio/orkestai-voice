@@ -35,26 +35,46 @@ router.post('/preview', async (req, res) => {
     return res.status(503).json({ error: 'TTS not configured (OPENAI_API_KEY missing)' });
   }
 
-  try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const model = voiceInstructions ? 'gpt-4o-mini-tts' : 'tts-1-hd';
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    logger.info('Generating preview audio', { chars: text.trim().length, model, hasInstructions: !!voiceInstructions });
+  const attempts = voiceInstructions
+    ? [
+        { model: 'gpt-4o-mini-tts', voice: 'nova', instructions: voiceInstructions },
+        { model: 'tts-1-hd',        voice: 'nova', instructions: null },
+      ]
+    : [{ model: 'tts-1-hd', voice: 'nova', instructions: null }];
 
-    const params = { model, voice: 'nova', input: text.trim(), response_format: 'mp3' };
-    if (voiceInstructions) params.instructions = voiceInstructions;
+  let lastError;
+  for (const attempt of attempts) {
+    try {
+      logger.info('Generating preview audio', {
+        chars: text.trim().length,
+        model: attempt.model,
+        hasInstructions: !!attempt.instructions,
+      });
 
-    const ttsResponse = await openai.audio.speech.create(params);
-    const buffer = Buffer.from(await ttsResponse.arrayBuffer());
+      const params = {
+        model: attempt.model,
+        voice: attempt.voice,
+        input: text.trim(),
+        response_format: 'mp3',
+      };
+      if (attempt.instructions) params.instructions = attempt.instructions;
 
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Length', buffer.length);
-    res.setHeader('Cache-Control', 'no-store');
-    res.send(buffer);
-  } catch (err) {
-    logger.error('Preview audio generation failed', { error: err.message });
-    res.status(500).json({ error: 'Failed to generate preview audio' });
+      const ttsResponse = await openai.audio.speech.create(params);
+      const buffer = Buffer.from(await ttsResponse.arrayBuffer());
+
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', buffer.length);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(buffer);
+    } catch (err) {
+      logger.error('Preview attempt failed', { model: attempt.model, error: err.message, status: err.status });
+      lastError = err;
+    }
   }
+
+  res.status(500).json({ error: lastError?.message ?? 'Failed to generate preview audio' });
 });
 
 router.get('/:filename', (req, res) => {

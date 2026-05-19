@@ -44,7 +44,8 @@ export function VoicePreviewPlayer({ voiceInstructions, defaultText = 'Hola Mar√
       prevBlobUrl.current = url;
       setAudioUrl(url);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al generar audio');
+      const msg = err instanceof Error ? err.message : 'Error al generar audio';
+      setError(`Error: ${msg}`);
     } finally {
       setLoading(false);
     }
