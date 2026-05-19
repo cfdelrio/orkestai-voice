@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
+import { VoicePreviewPlayer } from '@/components/VoicePreviewPlayer';
 import {
   createCampaign,
   setFlow,
@@ -247,6 +248,7 @@ export default function NewCampaignPage() {
               <p className="text-xs text-slate-400 mt-1">
                 Podés pedir acento, tono, velocidad, estilo. Estas instrucciones se pasan directamente al motor de voz IA.
               </p>
+              <VoicePreviewPlayer voiceInstructions={voiceInstructions} />
             </div>
 
             {/* Campaign variables */}
@@ -365,6 +367,12 @@ export default function NewCampaignPage() {
                   rows={2}
                   className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
                 />
+                {s.text.trim() && s.type !== 'speech_question' && (
+                  <VoicePreviewPlayer
+                    voiceInstructions={voiceInstructions}
+                    defaultText={s.text}
+                  />
+                )}
                 {s.type === 'dtmf_question' && (
                   <div className="mt-2 flex gap-3 text-xs text-slate-500">
                     <label className="flex items-center gap-1">

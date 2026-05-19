@@ -161,6 +161,25 @@ export const createContact = (tenantId: string, data: { firstName: string; lastN
 export const deleteContact = (tenantId: string, contactId: string, token?: string) =>
   apiFetch<{ deleted: boolean }>(`/api/tenants/${tenantId}/contacts/${contactId}`, { method: 'DELETE' }, token);
 
+/**
+ * Generates a TTS preview and returns a blob URL suitable for <audio src>.
+ * The caller is responsible for calling URL.revokeObjectURL() when done.
+ */
+export async function previewAudio(text: string, voiceInstructions?: string): Promise<string> {
+  const url = `${typeof window === 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL ?? '')}/api/audio/preview`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voiceInstructions }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? 'Preview failed');
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 export const createTenantOnboarding = (name: string, slug: string, token: string) =>
   apiFetch<{ tenant: { id: string; name: string; slug: string }; user: { id: string }; created: boolean }>('/api/onboarding', {
     method: 'POST',
