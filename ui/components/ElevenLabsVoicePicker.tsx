@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react';
 import { getElevenLabsVoices } from '@/lib/api';
 
-const PRESET_VOICE = { voiceId: 'ByVRQtaK1WDOvTmP1PKO', name: 'Voz personalizada', category: 'premade' };
+const PRESET_VOICES = [
+  { voiceId: 'ByVRQtaK1WDOvTmP1PKO', name: 'Voz personalizada', category: 'premade' },
+  { voiceId: 'p7AwDmKvTdoHTBuueGvP', name: 'Malena',             category: 'premade' },
+  { voiceId: '9FG0AH71kXEuvM9IJg7u', name: 'Mart',               category: 'premade' },
+];
+const PRESET_IDS = new Set(PRESET_VOICES.map((v) => v.voiceId));
 
 interface Voice { voiceId: string; name: string; category: string }
 
@@ -13,7 +18,7 @@ interface Props {
 }
 
 export function ElevenLabsVoicePicker({ value, onChange }: Props) {
-  const [voices, setVoices] = useState<Voice[]>([PRESET_VOICE]);
+  const [voices, setVoices] = useState<Voice[]>(PRESET_VOICES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -21,8 +26,8 @@ export function ElevenLabsVoicePicker({ value, onChange }: Props) {
     getElevenLabsVoices()
       .then((v) => {
         const merged = [
-          PRESET_VOICE,
-          ...v.filter((x) => x.voiceId !== PRESET_VOICE.voiceId),
+          ...PRESET_VOICES,
+          ...v.filter((x) => !PRESET_IDS.has(x.voiceId)),
         ];
         setVoices(merged);
       })
