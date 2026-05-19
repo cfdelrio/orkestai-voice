@@ -31,6 +31,15 @@ const EMPTY_FLOW_STEP = (): FlowStep => ({
   text: '',
 });
 
+const VOICE_OPTIONS = [
+  { value: 'nova',    label: 'Nova',    desc: 'Femenina · cálida' },
+  { value: 'shimmer', label: 'Shimmer', desc: 'Femenina · suave' },
+  { value: 'alloy',   label: 'Alloy',   desc: 'Neutral' },
+  { value: 'echo',    label: 'Echo',    desc: 'Masculina · natural' },
+  { value: 'onyx',    label: 'Onyx',    desc: 'Masculina · profunda' },
+  { value: 'fable',   label: 'Fable',   desc: 'Masculina · narrativa' },
+];
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const { getToken } = useAuth();
@@ -50,6 +59,7 @@ export default function NewCampaignPage() {
   const [voiceInstructions, setVoiceInstructions] = useState(
     'Hablá con acento rioplatense, tono cálido y profesional. Ritmo natural, sin apuro. Cuando saludes usá "Hola" y tuteo.'
   );
+  const [voice, setVoice] = useState('nova');
 
   // Step 2
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([
@@ -93,6 +103,7 @@ export default function NewCampaignPage() {
         description: description.trim() || undefined,
         variables: buildVariablesMap(),
         voiceInstructions: voiceInstructions.trim() || undefined,
+        voice,
       }, token);
       setCampaignId(res.campaign.id);
       setStep('flow');
@@ -232,6 +243,28 @@ export default function NewCampaignPage() {
               />
             </div>
 
+            {/* Voice selector */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Voz</label>
+              <div className="grid grid-cols-3 gap-2">
+                {VOICE_OPTIONS.map((v) => (
+                  <button
+                    key={v.value}
+                    type="button"
+                    onClick={() => setVoice(v.value)}
+                    className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-colors ${
+                      voice === v.value
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <span className="text-sm font-medium">{v.label}</span>
+                    <span className="text-xs text-slate-400">{v.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Voice instructions */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -248,7 +281,7 @@ export default function NewCampaignPage() {
               <p className="text-xs text-slate-400 mt-1">
                 Podés pedir acento, tono, velocidad, estilo. Estas instrucciones se pasan directamente al motor de voz IA.
               </p>
-              <VoicePreviewPlayer voiceInstructions={voiceInstructions} />
+              <VoicePreviewPlayer voiceInstructions={voiceInstructions} voice={voice} />
             </div>
 
             {/* Campaign variables */}
@@ -370,6 +403,7 @@ export default function NewCampaignPage() {
                 {s.text.trim() && s.type !== 'speech_question' && (
                   <VoicePreviewPlayer
                     voiceInstructions={voiceInstructions}
+                    voice={voice}
                     defaultText={s.text}
                   />
                 )}

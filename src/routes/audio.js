@@ -25,7 +25,9 @@ const AUDIO_DIR = path.join(process.cwd(), 'audio');
  * Response: audio/mpeg
  */
 router.post('/preview', async (req, res) => {
-  const { text, voiceInstructions } = req.body ?? {};
+  const { text, voiceInstructions, voice } = req.body ?? {};
+  const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+  const resolvedVoice = VALID_VOICES.includes(voice) ? voice : 'nova';
 
   if (!text || typeof text !== 'string' || !text.trim()) {
     return res.status(400).json({ error: '"text" is required' });
@@ -39,10 +41,10 @@ router.post('/preview', async (req, res) => {
 
   const attempts = voiceInstructions
     ? [
-        { model: 'gpt-4o-mini-tts', voice: 'nova', instructions: voiceInstructions },
-        { model: 'tts-1-hd',        voice: 'nova', instructions: null },
+        { model: 'gpt-4o-mini-tts', voice: resolvedVoice, instructions: voiceInstructions },
+        { model: 'tts-1-hd',        voice: resolvedVoice, instructions: null },
       ]
-    : [{ model: 'tts-1-hd', voice: 'nova', instructions: null }];
+    : [{ model: 'tts-1-hd', voice: resolvedVoice, instructions: null }];
 
   let lastError;
   for (const attempt of attempts) {

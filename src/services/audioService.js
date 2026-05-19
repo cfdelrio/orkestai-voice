@@ -19,7 +19,12 @@ const prisma = new PrismaClient();
 
 const AUDIO_DIR = path.join(process.cwd(), 'audio');
 const RECORDINGS_DIR = path.join(process.cwd(), 'recordings');
-const VOICE = 'nova';
+const VOICE_DEFAULT = 'nova';
+const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+
+function resolveVoice(voice) {
+  return VALID_VOICES.includes(voice) ? voice : VOICE_DEFAULT;
+}
 // gpt-4o-mini-tts supports the `instructions` param for style/accent control
 const MODEL_WITH_INSTRUCTIONS = 'gpt-4o-mini-tts';
 // tts-1-hd is the fallback when no instructions are provided
@@ -72,8 +77,9 @@ function getAudioUrl(recipientId, stepId, webhookBase) {
  * @param {string} stepId
  * @param {string} text         - Already interpolated plain text
  * @param {string} [instructions] - Voice style instructions (accent, tone, pace)
+ * @param {string} [voice]        - OpenAI voice ID (alloy, echo, fable, onyx, nova, shimmer)
  */
-async function generateAudio(recipientId, stepId, text, instructions) {
+async function generateAudio(recipientId, stepId, text, instructions, voice) {
   const filepath = getFilepath(recipientId, stepId);
 
   if (fs.existsSync(filepath)) {
@@ -91,11 +97,12 @@ async function generateAudio(recipientId, stepId, text, instructions) {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const model = instructions ? MODEL_WITH_INSTRUCTIONS : MODEL_DEFAULT;
-  logger.info('Generating audio', { recipientId, stepId, chars: text.length, model, hasInstructions: !!instructions });
+  const resolvedVoice = resolveVoice(voice);
+  logger.info('Generating audio', { recipientId, stepId, chars: text.length, model, voice: resolvedVoice, hasInstructions: !!instructions });
 
   const params = {
     model,
-    voice: VOICE,
+    voice: resolvedVoice,
     input: text,
     response_format: 'mp3',
   };
@@ -116,14 +123,15 @@ async function generateAudio(recipientId, stepId, text, instructions) {
  * @param {Array<{id: string, text: string, type: string}>} steps
  * @param {Record<string, string>} vars         - Template variables for this contact
  * @param {string}                [instructions] - Voice style instructions
+ * @param {string}                [voice]        - OpenAI voice ID
  */
-async function generateAudioForRecipient(recipientId, steps, vars, instructions) {
+async function generateAudioForRecipient(recipientId, steps, vars, instructions, voice) {
   const { interpolateTemplate } = require('./templateEngine');
 
   const results = await Promise.allSettled(
     steps.map((step) => {
       const text = interpolateTemplate(step.text || '', vars);
-      return generateAudio(recipientId, step.id, text, instructions);
+      return generateAudio(recipientId, step.id, text, instructions, voice);
     })
   );
 
