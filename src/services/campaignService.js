@@ -30,7 +30,7 @@ const VALID_STEP_TYPES = ['say', 'dtmf_question', 'speech_question', 'goodbye'];
  */
 const VALID_OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
-async function createCampaign(tenantId, { name, description, variables = {}, voiceInstructions, voice, metadata = {} }) {
+async function createCampaign(tenantId, { name, description, variables = {}, voiceInstructions, voice, ttsProvider, elevenLabsVoiceId, metadata = {} }) {
   await getTenantById(tenantId);
 
   if (!name || !name.trim()) {
@@ -42,6 +42,8 @@ async function createCampaign(tenantId, { name, description, variables = {}, voi
   const resolvedMetadata = { ...metadata };
   if (voiceInstructions) resolvedMetadata.voiceInstructions = voiceInstructions.trim();
   if (voice && VALID_OPENAI_VOICES.includes(voice)) resolvedMetadata.voice = voice;
+  if (ttsProvider === 'elevenlabs' || ttsProvider === 'openai') resolvedMetadata.ttsProvider = ttsProvider;
+  if (elevenLabsVoiceId) resolvedMetadata.elevenLabsVoiceId = elevenLabsVoiceId;
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -69,7 +71,7 @@ async function createCampaign(tenantId, { name, description, variables = {}, voi
  * @param {Object} [data.variables]
  * @returns {Promise<Object>} Updated campaign record
  */
-async function updateCampaign(campaignId, { voiceInstructions, voice, variables }) {
+async function updateCampaign(campaignId, { voiceInstructions, voice, ttsProvider, elevenLabsVoiceId, variables }) {
   const campaign = await getCampaignById(campaignId);
 
   const updateData = {};
@@ -78,12 +80,18 @@ async function updateCampaign(campaignId, { voiceInstructions, voice, variables 
     updateData.variables = variables;
   }
 
-  const voiceChanged = voiceInstructions !== undefined || (voice !== undefined && VALID_OPENAI_VOICES.includes(voice));
+  const voiceChanged = voiceInstructions !== undefined
+    || (voice !== undefined && VALID_OPENAI_VOICES.includes(voice))
+    || ttsProvider !== undefined
+    || elevenLabsVoiceId !== undefined;
+
   if (voiceChanged) {
     const currentMeta = (campaign.metadata && typeof campaign.metadata === 'object') ? campaign.metadata : {};
     updateData.metadata = { ...currentMeta };
     if (voiceInstructions !== undefined) updateData.metadata.voiceInstructions = voiceInstructions.trim();
     if (voice && VALID_OPENAI_VOICES.includes(voice)) updateData.metadata.voice = voice;
+    if (ttsProvider === 'elevenlabs' || ttsProvider === 'openai') updateData.metadata.ttsProvider = ttsProvider;
+    if (elevenLabsVoiceId !== undefined) updateData.metadata.elevenLabsVoiceId = elevenLabsVoiceId;
   }
 
   if (Object.keys(updateData).length === 0) {

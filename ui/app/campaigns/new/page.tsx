@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { VoicePreviewPlayer } from '@/components/VoicePreviewPlayer';
+import { ElevenLabsVoicePicker } from '@/components/ElevenLabsVoicePicker';
 import {
   createCampaign,
   setFlow,
@@ -60,6 +61,8 @@ export default function NewCampaignPage() {
     'Hablá con acento rioplatense, tono cálido y profesional. Ritmo natural, sin apuro. Cuando saludes usá "Hola" y tuteo.'
   );
   const [voice, setVoice] = useState('nova');
+  const [ttsProvider, setTtsProvider] = useState<'openai' | 'elevenlabs'>('openai');
+  const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState('ByVRQtaK1WDOvTmP1PKO');
 
   // Step 2
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([
@@ -102,8 +105,10 @@ export default function NewCampaignPage() {
         name: name.trim(),
         description: description.trim() || undefined,
         variables: buildVariablesMap(),
-        voiceInstructions: voiceInstructions.trim() || undefined,
-        voice,
+        voiceInstructions: ttsProvider === 'openai' ? voiceInstructions.trim() || undefined : undefined,
+        voice: ttsProvider === 'openai' ? voice : undefined,
+        ttsProvider,
+        elevenLabsVoiceId: ttsProvider === 'elevenlabs' ? elevenLabsVoiceId : undefined,
       }, token);
       setCampaignId(res.campaign.id);
       setStep('flow');
@@ -243,46 +248,85 @@ export default function NewCampaignPage() {
               />
             </div>
 
-            {/* Voice selector */}
+            {/* TTS provider toggle */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Voz</label>
-              <div className="grid grid-cols-3 gap-2">
-                {VOICE_OPTIONS.map((v) => (
-                  <button
-                    key={v.value}
-                    type="button"
-                    onClick={() => setVoice(v.value)}
-                    className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-colors ${
-                      voice === v.value
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                    }`}
-                  >
-                    <span className="text-sm font-medium">{v.label}</span>
-                    <span className="text-xs text-slate-400">{v.desc}</span>
-                  </button>
-                ))}
+              <label className="block text-sm font-medium text-slate-700 mb-2">Motor de voz</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTtsProvider('openai')}
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    ttsProvider === 'openai'
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'border-slate-300 text-slate-600 hover:border-indigo-300'
+                  }`}
+                >
+                  OpenAI TTS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTtsProvider('elevenlabs')}
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    ttsProvider === 'elevenlabs'
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'border-slate-300 text-slate-600 hover:border-purple-300'
+                  }`}
+                >
+                  ElevenLabs
+                </button>
               </div>
             </div>
 
-            {/* Voice instructions */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Instrucciones de voz
-                <span className="text-slate-400 font-normal ml-1">(cómo debe hablar el asistente)</span>
-              </label>
-              <textarea
-                value={voiceInstructions}
-                onChange={(e) => setVoiceInstructions(e.target.value)}
-                rows={3}
-                placeholder="Ej: Hablá con acento rioplatense, tono cálido y profesional..."
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                Podés pedir acento, tono, velocidad, estilo. Estas instrucciones se pasan directamente al motor de voz IA.
-              </p>
-              <VoicePreviewPlayer voiceInstructions={voiceInstructions} voice={voice} />
-            </div>
+            {ttsProvider === 'openai' ? (
+              <>
+                {/* OpenAI voice selector */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Voz</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {VOICE_OPTIONS.map((v) => (
+                      <button
+                        key={v.value}
+                        type="button"
+                        onClick={() => setVoice(v.value)}
+                        className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-colors ${
+                          voice === v.value
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        <span className="text-sm font-medium">{v.label}</span>
+                        <span className="text-xs text-slate-400">{v.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Voice instructions */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Instrucciones de voz
+                    <span className="text-slate-400 font-normal ml-1">(cómo debe hablar el asistente)</span>
+                  </label>
+                  <textarea
+                    value={voiceInstructions}
+                    onChange={(e) => setVoiceInstructions(e.target.value)}
+                    rows={3}
+                    placeholder="Ej: Hablá con acento rioplatense, tono cálido y profesional..."
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    Podés pedir acento, tono, velocidad, estilo. Se pasan directamente al motor de voz IA.
+                  </p>
+                  <VoicePreviewPlayer voiceInstructions={voiceInstructions} voice={voice} ttsProvider="openai" />
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Voz ElevenLabs</label>
+                <ElevenLabsVoicePicker value={elevenLabsVoiceId} onChange={setElevenLabsVoiceId} />
+                <VoicePreviewPlayer ttsProvider="elevenlabs" elevenLabsVoiceId={elevenLabsVoiceId} />
+              </div>
+            )}
 
             {/* Campaign variables */}
             <div>
@@ -402,8 +446,10 @@ export default function NewCampaignPage() {
                 />
                 {s.text.trim() && s.type !== 'speech_question' && (
                   <VoicePreviewPlayer
-                    voiceInstructions={voiceInstructions}
-                    voice={voice}
+                    voiceInstructions={ttsProvider === 'openai' ? voiceInstructions : undefined}
+                    voice={ttsProvider === 'openai' ? voice : undefined}
+                    ttsProvider={ttsProvider}
+                    elevenLabsVoiceId={ttsProvider === 'elevenlabs' ? elevenLabsVoiceId : undefined}
                     defaultText={s.text}
                   />
                 )}

@@ -157,6 +157,8 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
         campaignId={campaign.id}
         initialInstructions={String(campaign.metadata?.voiceInstructions ?? '')}
         initialVoice={String(campaign.metadata?.voice ?? 'nova')}
+        initialTtsProvider={String(campaign.metadata?.ttsProvider ?? 'openai')}
+        initialElevenLabsVoiceId={String(campaign.metadata?.elevenLabsVoiceId ?? 'ByVRQtaK1WDOvTmP1PKO')}
       />
 
       {/* Stats */}
