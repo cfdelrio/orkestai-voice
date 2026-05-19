@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/public/(.*)']);
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? 'voice.orkestai.com.ar';
 const API_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
@@ -42,6 +42,11 @@ async function getUserTenantSlug(token: string): Promise<string | null> {
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
     await auth.protect();
+  }
+
+  // Public feed routes don't need tenant resolution or subdomain redirects
+  if (req.nextUrl.pathname.startsWith('/public/')) {
+    return NextResponse.next();
   }
 
   const host = req.headers.get('host') ?? '';

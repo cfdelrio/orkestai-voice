@@ -11,6 +11,7 @@ const PUBLIC_PREFIXES = [
   '/twiml/',
   '/tenants/slug/',
   '/audio/',
+  '/public/',
 ];
 // Routes that verify the JWT but don't require a linked User record in DB
 const TOKEN_ONLY_PATHS = [

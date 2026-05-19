@@ -14,6 +14,7 @@ const { Router } = require('express');
 const { asyncHandler, badRequest } = require('../middleware/errorHandler');
 const campaignService = require('../services/campaignService');
 const callService = require('../services/callService');
+const publicFeedService = require('../services/publicFeedService');
 
 // ─── Tenant-scoped campaign routes ────────────────────────────────────────────
 
@@ -179,6 +180,47 @@ campaignRouter.patch('/:campaignId', asyncHandler(async (req, res) => {
  */
 campaignRouter.delete('/:campaignId', asyncHandler(async (req, res) => {
   const result = await campaignService.deleteCampaign(req.params.campaignId);
+  res.json(result);
+}));
+
+/**
+ * GET /api/campaigns/:campaignId/feed-config
+ * Returns the public feed config for a campaign (null if not set).
+ */
+campaignRouter.get('/:campaignId/feed-config', asyncHandler(async (req, res) => {
+  const config = await publicFeedService.getFeedConfig(req.params.campaignId);
+  res.json({ feedConfig: config });
+}));
+
+/**
+ * POST /api/campaigns/:campaignId/feed-config
+ * Creates or updates the public feed config.
+ *
+ * Body: { slug, title, description?, enabled?, publicQuestions?, showRecentActivity?, refreshIntervalSeconds? }
+ */
+campaignRouter.post('/:campaignId/feed-config', asyncHandler(async (req, res) => {
+  const { campaignId } = req.params;
+  const { slug, title, ...rest } = req.body;
+
+  const existing = await publicFeedService.getFeedConfig(campaignId);
+  if (!existing && (!slug || !title)) {
+    throw badRequest('"slug" and "title" are required when creating a feed config');
+  }
+  if (slug && !/^[a-z0-9-]+$/.test(slug)) {
+    throw badRequest('"slug" must be lowercase alphanumeric with hyphens only');
+  }
+
+  const config = await publicFeedService.upsertFeedConfig(campaignId, { slug, title, ...rest });
+  res.status(existing ? 200 : 201).json({ feedConfig: config });
+}));
+
+/**
+ * DELETE /api/campaigns/:campaignId/feed-config
+ * Removes the public feed config (disables the feed permanently).
+ */
+campaignRouter.delete('/:campaignId/feed-config', asyncHandler(async (req, res) => {
+  const result = await publicFeedService.deleteFeedConfig(req.params.campaignId);
+  if (!result) return res.status(404).json({ error: { message: 'Feed config not found' } });
   res.json(result);
 }));
 

@@ -63,6 +63,25 @@ model Campaign {
   flow        VoiceFlow?
   recipients  CampaignRecipient[]
   calls       Call[]
+  publicFeed  PublicFeedConfig?
+}
+
+model PublicFeedConfig {
+  id                     String   @id @default(uuid())
+  campaignId             String   @unique
+  campaign               Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  enabled                Boolean  @default(true)
+  slug                   String   @unique
+  title                  String
+  description            String?
+  showTotalCalls         Boolean  @default(true)
+  showResponseRate       Boolean  @default(true)
+  showRecentActivity     Boolean  @default(true)
+  showPercentages        Boolean  @default(true)
+  refreshIntervalSeconds Int      @default(10)
+  publicQuestions        Json     @default("[]")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 model VoiceFlow {

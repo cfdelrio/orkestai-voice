@@ -24,6 +24,7 @@ const twimlRouter = require('./routes/twiml');
 const usersRouter = require('./routes/users');
 const onboardingRouter = require('./routes/onboarding');
 const audioRouter = require('./routes/audio');
+const publicRouter = require('./routes/public');
 
 const app = express();
 const logger = createLogger('App');
@@ -81,6 +82,9 @@ app.use('/api/twiml', twimlRouter);
 
 // Pre-generated TTS audio files (Twilio fetches via <Play> — no auth)
 app.use('/api/audio', audioRouter);
+
+// Public campaign feeds (no auth, rate limited)
+app.use('/api/public', publicRouter);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
