@@ -38,7 +38,6 @@ const STATUS_LABEL: Record<string, string> = {
   pending:         'Pendiente',
   called:          'Llamado',
   sandbox_pending: 'En sandbox',
-  sandbox:         '🧪 Sandbox',
 };
 
 const CALL_STATUS_LABEL: Record<string, string> = {
