@@ -187,6 +187,9 @@ async function handleWebhookEvent(event) {
 
   if (['completed', 'failed', 'no_answer'].includes(status)) {
     callUpdateData.endedAt = new Date();
+    if (call.startedAt) {
+      callUpdateData.duration = Math.round((Date.now() - call.startedAt.getTime()) / 1000);
+    }
   }
 
   const updatedCall = await prisma.call.update({

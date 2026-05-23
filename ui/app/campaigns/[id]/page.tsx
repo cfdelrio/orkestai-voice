@@ -65,9 +65,17 @@ function RecipientRow({ r, stepLabels }: { r: CampaignRecipient; stepLabels: Rec
       </td>
       <td className="px-4 py-3">
         {callStatus ? (
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[callStatus] ?? 'bg-slate-100 text-slate-500'}`}>
-            {CALL_STATUS_LABEL[callStatus] ?? callStatus}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[callStatus] ?? 'bg-slate-100 text-slate-500'}`}>
+              {CALL_STATUS_LABEL[callStatus] ?? callStatus}
+            </span>
+            {callStatus === 'answered' && r.lastCall?.duration && (
+              <span className="text-xs text-green-600 font-medium">{r.lastCall.duration}s</span>
+            )}
+            {callStatus === 'completed' && r.lastCall?.duration && (
+              <span className="text-xs text-slate-500 font-medium">{r.lastCall.duration}s</span>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-slate-400">—</span>
         )}
