@@ -99,28 +99,41 @@ async function generateAudioElevenLabs(filepath, text, voiceId) {
 
   logger.info('ElevenLabs TTS', { chars: text.length, voiceId });
 
-  const res = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': process.env.ELEVENLABS_API_KEY,
-      'Content-Type': 'application/json',
-      'Accept': 'audio/mpeg',
-    },
-    body: JSON.stringify({
-      text,
-      model_id: ELEVENLABS_MODEL,
-      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true },
-    }),
-  });
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
 
-  if (!res.ok) {
+    const res = await fetch(`${ELEVENLABS_API}/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': process.env.ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: ELEVENLABS_MODEL,
+        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true },
+      }),
+    });
+
+    if (res.ok) {
+      const buffer = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(filepath, buffer);
+      logger.info('ElevenLabs TTS saved', { bytes: buffer.length, attempt: attempt + 1 });
+      return;
+    }
+
     const detail = await res.text().catch(() => res.statusText);
-    throw new Error(`ElevenLabs TTS error ${res.status}: ${detail}`);
+    lastErr = `ElevenLabs TTS error ${res.status}: ${detail}`;
+    // Only retry on rate-limit or server errors
+    if (res.status !== 429 && res.status < 500) {
+      throw new Error(lastErr);
+    }
+    logger.warn('ElevenLabs TTS transient error — retrying', { attempt: attempt + 1, status: res.status });
   }
 
-  const buffer = Buffer.from(await res.arrayBuffer());
-  fs.writeFileSync(filepath, buffer);
-  logger.info('ElevenLabs TTS saved', { bytes: buffer.length });
+  throw new Error(`${lastErr} (after retry)`);
 }
 
 /**
@@ -180,23 +193,25 @@ async function generateAudio(recipientId, stepId, text, instructions, voice, tts
 async function generateAudioForRecipient(recipientId, steps, vars, instructions, voice, ttsProvider, elevenLabsVoiceId) {
   const { interpolateTemplate } = require('./templateEngine');
 
-  const results = await Promise.allSettled(
+  const outcomes = await Promise.all(
     steps.map((step) => {
       const text = interpolateTemplate(step.text || '', vars);
       // Per-step overrides fall back to campaign-level settings
       const stepVoice = step.voice || voice;
       const stepInstructions = step.voiceInstructions || instructions;
       const stepElevenLabsVoiceId = step.elevenLabsVoiceId || elevenLabsVoiceId;
-      return generateAudio(recipientId, step.id, text, stepInstructions, stepVoice, ttsProvider, stepElevenLabsVoiceId);
+      return generateAudio(recipientId, step.id, text, stepInstructions, stepVoice, ttsProvider, stepElevenLabsVoiceId)
+        .then(() => ({ stepId: step.id, ok: true }))
+        .catch((err) => ({ stepId: step.id, ok: false, error: err.message }));
     })
   );
 
-  const failed = results.filter((r) => r.status === 'rejected');
+  const failed = outcomes.filter((o) => !o.ok);
   if (failed.length > 0) {
-    logger.warn('Some audio steps failed to generate', {
+    logger.warn('Audio generation failed for steps — call will use <Say> fallback', {
       recipientId,
-      failed: failed.length,
-      errors: failed.map((r) => r.reason?.message),
+      ttsProvider,
+      failedSteps: failed,
     });
   }
 }

@@ -92,8 +92,12 @@ function buildTwimlVerbs(steps, vars, webhookBase, recipientId, voice) {
   for (const step of steps) {
     const text = escapeXml(interpolateTemplate(step.text || '', vars));
 
-    // Use pre-generated OpenAI TTS audio if available, otherwise fall back to <Say>
-    const audioTag = audioExists(recipientId, step.id)
+    // Use pre-generated TTS audio if available, otherwise fall back to <Say>
+    const fileExists = audioExists(recipientId, step.id);
+    if (!fileExists) {
+      logger.warn('Pre-generated audio missing — using <Say> fallback', { recipientId, stepId: step.id, stepType: step.type });
+    }
+    const audioTag = fileExists
       ? `<Play>${getAudioUrl(recipientId, step.id, webhookBase)}</Play>`
       : buildSayTag(text, voice);
 
