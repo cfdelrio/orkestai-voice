@@ -56,11 +56,24 @@ async function startCampaign(campaignId, { sandbox = false, limit = 5 } = {}) {
     );
   }
 
-  // Reset any sandbox-processed recipients back to pending so they can be re-called
+  // Reset sandbox-processed recipients back to pending
   await prisma.campaignRecipient.updateMany({
     where: { campaignId, status: { in: ['sandbox', 'sandbox_pending'] } },
     data: { status: 'pending' },
   });
+
+  // When re-launching a completed campaign with no pending recipients, reset all called/failed
+  if (campaign.status === 'completed') {
+    const pendingBeforeReset = await prisma.campaignRecipient.count({
+      where: { campaignId, status: 'pending' },
+    });
+    if (pendingBeforeReset === 0) {
+      await prisma.campaignRecipient.updateMany({
+        where: { campaignId, status: { in: ['called', 'failed'] } },
+        data: { status: 'pending' },
+      });
+    }
+  }
 
   // Load pending recipients with their contact data
   const pendingRecipients = await prisma.campaignRecipient.findMany({
