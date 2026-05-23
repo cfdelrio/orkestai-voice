@@ -7,6 +7,7 @@ import { CampaignActions } from './CampaignActions';
 import { CampaignCharts } from './CampaignCharts';
 import { AddRecipientsModal } from './AddRecipientsModal';
 import { VoiceInstructionsEditor } from './VoiceInstructionsEditor';
+import { FeedConfigEditor } from './FeedConfigEditor';
 
 const STATUS_COLORS: Record<string, string> = {
   draft:      'bg-slate-100 text-slate-600',
@@ -151,6 +152,13 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
           <CampaignActions campaignId={campaign.id} status={campaign.status} pendingCount={pendingCount} />
         </div>
       </div>
+
+      {/* Public feed editor */}
+      <FeedConfigEditor
+        campaignId={campaign.id}
+        campaignName={campaign.name}
+        flowSteps={flow?.steps ?? []}
+      />
 
       {/* Voice instructions editor */}
       <VoiceInstructionsEditor

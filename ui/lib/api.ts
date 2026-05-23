@@ -199,3 +199,42 @@ export const createTenantOnboarding = (name: string, slug: string, token: string
     method: 'POST',
     body: JSON.stringify({ name, slug }),
   }, token);
+
+export interface PublicQuestion {
+  stepId: string;
+  title: string;
+  optionLabels: Record<string, string>;
+}
+
+export interface PublicFeedConfig {
+  id: string;
+  campaignId: string;
+  enabled: boolean;
+  slug: string;
+  title: string;
+  description: string | null;
+  showTotalCalls: boolean;
+  showResponseRate: boolean;
+  showRecentActivity: boolean;
+  showPercentages: boolean;
+  refreshIntervalSeconds: number;
+  publicQuestions: PublicQuestion[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const getFeedConfig = (campaignId: string, token?: string) =>
+  apiFetch<{ feedConfig: PublicFeedConfig | null }>(`/api/campaigns/${campaignId}/feed-config`, undefined, token);
+
+export const upsertFeedConfig = (
+  campaignId: string,
+  data: Partial<Omit<PublicFeedConfig, 'id' | 'campaignId' | 'createdAt' | 'updatedAt'>>,
+  token?: string,
+) =>
+  apiFetch<{ feedConfig: PublicFeedConfig }>(`/api/campaigns/${campaignId}/feed-config`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteFeedConfig = (campaignId: string, token?: string) =>
+  apiFetch<{ deleted: boolean }>(`/api/campaigns/${campaignId}/feed-config`, { method: 'DELETE' }, token);
