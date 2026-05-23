@@ -27,6 +27,7 @@ const audioRouter = require('./routes/audio');
 const publicRouter = require('./routes/public');
 const apiKeysRouter = require('./routes/apiKeys');
 const webhookEndpointsRouter = require('./routes/webhookEndpoints');
+const internalRouter = require('./routes/internal');
 
 const app = express();
 const logger = createLogger('App');
@@ -93,6 +94,9 @@ app.use('/api/tenants/:tenantId/api-keys', apiKeysRouter);
 
 // Outgoing webhook endpoints
 app.use('/api/tenants/:tenantId/webhook-endpoints', webhookEndpointsRouter);
+
+// Internal service-to-service endpoints (auth via X-Shared-Secret, no Clerk)
+app.use('/internal', internalRouter);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
