@@ -15,6 +15,15 @@ const VOICE_OPTIONS = [
   { value: 'fable',   label: 'Fable',   desc: 'Masculina · narrativa' },
 ];
 
+const SUGGESTIONS = [
+  { label: 'Acento rioplatense',      text: 'Hablá con acento rioplatense marcado.' },
+  { label: 'Hablar despacio',         text: 'Hablá despacio y con pausas claras entre frases.' },
+  { label: 'Tono cálido y cercano',   text: 'Tono cálido, cercano y amigable, como hablándole a un conocido.' },
+  { label: 'Profesional y directo',   text: 'Tono profesional, claro y directo. Sin exagerar.' },
+  { label: 'Entusiasta moderado',     text: 'Con entusiasmo moderado, positivo pero sin sonar artificial.' },
+  { label: 'Pronunciar pausas',       text: 'Hacé una pausa breve antes de cada dato importante (número, fecha, nombre).' },
+];
+
 interface Props {
   campaignId: string;
   initialInstructions: string;
@@ -62,6 +71,10 @@ export function VoiceInstructionsEditor({
     } finally {
       setSaving(false);
     }
+  }
+
+  function appendSuggestion(text: string) {
+    setInstructions((prev) => prev ? `${prev.trim()} ${text}` : text);
   }
 
   const currentVoiceLabel = ttsProvider === 'elevenlabs'
@@ -132,22 +145,48 @@ export function VoiceInstructionsEditor({
                 ))}
               </div>
 
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                rows={3}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none font-mono"
-                placeholder="Ej: Hablá con acento rioplatense, tono cálido y profesional..."
-              />
+              {/* Instructions */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <label className="text-xs font-medium text-slate-600">Instrucciones de expresión</label>
+                  <span className="text-xs text-slate-400" title="Describe cómo debe sonar la voz: acento, velocidad, tono, pausas, pronunciaciones específicas. El modelo gpt-4o-mini-tts interpreta estas instrucciones en lenguaje natural.">
+                    ⓘ
+                  </span>
+                </div>
+                {/* Suggestion chips */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => appendSuggestion(s.text)}
+                      className="text-xs px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    >
+                      + {s.label}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  rows={3}
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                  placeholder="Ej: Hablá con acento rioplatense, pausá antes de cada número, tono cálido y cercano..."
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Podés indicar acento, velocidad, tono, emociones y pronunciaciones específicas. Usá lenguaje natural.
+                </p>
+              </div>
 
               <VoicePreviewPlayer voiceInstructions={instructions} voice={voice} ttsProvider="openai" />
             </>
           ) : (
             <>
-              {/* ElevenLabs voice picker */}
               <ElevenLabsVoicePicker value={elevenLabsVoiceId} onChange={setElevenLabsVoiceId} />
-
               <VoicePreviewPlayer ttsProvider="elevenlabs" elevenLabsVoiceId={elevenLabsVoiceId} />
+              <p className="text-xs text-slate-400 bg-slate-50 rounded-md px-3 py-2 border border-slate-200">
+                ElevenLabs no soporta instrucciones de texto. Para ajustar acento y expresión, seleccioná una voz con las características deseadas o cambiá a OpenAI TTS.
+              </p>
             </>
           )}
 
@@ -171,7 +210,7 @@ export function VoiceInstructionsEditor({
             <>
               <span className="text-slate-300">·</span>
               <span className="font-mono leading-relaxed flex-1 truncate">
-                {instructions || <span className="italic text-slate-400">Sin instrucciones</span>}
+                {instructions || <span className="italic text-slate-400">Sin instrucciones — hacé click en Editar para ajustar acento y expresión</span>}
               </span>
             </>
           )}
