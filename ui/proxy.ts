@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/public/(.*)']);
+const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/public/(.*)', '/internal/(.*)']);
 
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? 'voice.orkestai.com.ar';
 const API_URL = process.env.API_BASE_URL ?? 'http://localhost:3000';
@@ -44,8 +44,8 @@ export default clerkMiddleware(async (auth, req) => {
     await auth.protect();
   }
 
-  // Public feed routes don't need tenant resolution or subdomain redirects
-  if (req.nextUrl.pathname.startsWith('/public/')) {
+  // Public and internal routes don't need tenant resolution or subdomain redirects
+  if (req.nextUrl.pathname.startsWith('/public/') || req.nextUrl.pathname.startsWith('/internal/')) {
     return NextResponse.next();
   }
 
