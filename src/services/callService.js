@@ -14,6 +14,7 @@ const { createProvider } = require('./providerFactory');
 const { config } = require('../config/env');
 const { callQueue } = require('../queues/index');
 const webhookService = require('./webhookService');
+const { deleteAudioForCampaign } = require('./audioService');
 
 const prisma = new PrismaClient();
 const logger = createLogger('CallService');
@@ -56,11 +57,20 @@ async function startCampaign(campaignId, { sandbox = false, limit = 5 } = {}) {
     );
   }
 
-  // Reset sandbox-processed recipients back to pending
-  await prisma.campaignRecipient.updateMany({
+  // Reset sandbox-processed recipients back to pending and clear their stale audio
+  const sandboxRecipients = await prisma.campaignRecipient.findMany({
     where: { campaignId, status: { in: ['sandbox', 'sandbox_pending'] } },
-    data: { status: 'pending' },
+    select: { id: true },
   });
+  if (sandboxRecipients.length > 0) {
+    await prisma.campaignRecipient.updateMany({
+      where: { campaignId, status: { in: ['sandbox', 'sandbox_pending'] } },
+      data: { status: 'pending' },
+    });
+    if (campaign.flow?.steps) {
+      deleteAudioForCampaign(sandboxRecipients.map((r) => r.id), campaign.flow.steps.map((s) => s.id));
+    }
+  }
 
   // When re-launching a completed campaign with no pending recipients, reset all called/failed
   if (campaign.status === 'completed') {
@@ -68,10 +78,18 @@ async function startCampaign(campaignId, { sandbox = false, limit = 5 } = {}) {
       where: { campaignId, status: 'pending' },
     });
     if (pendingBeforeReset === 0) {
+      const resetRecipients = await prisma.campaignRecipient.findMany({
+        where: { campaignId, status: { in: ['called', 'failed'] } },
+        select: { id: true },
+      });
       await prisma.campaignRecipient.updateMany({
         where: { campaignId, status: { in: ['called', 'failed'] } },
         data: { status: 'pending' },
       });
+      // Delete stale audio so next calls use current TTS/voice settings
+      if (resetRecipients.length > 0 && campaign.flow?.steps) {
+        deleteAudioForCampaign(resetRecipients.map((r) => r.id), campaign.flow.steps.map((s) => s.id));
+      }
     }
   }
 
