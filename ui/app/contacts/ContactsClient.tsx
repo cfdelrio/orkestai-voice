@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createContact, deleteContact, type Contact } from '@/lib/api';
+import { createContact, updateContact, deleteContact, type Contact } from '@/lib/api';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -254,6 +254,85 @@ function CsvModal({ tenantId, token, onClose, onImported }: { tenantId: string; 
   );
 }
 
+// ─── Edit contact modal ───────────────────────────────────────────────────────
+
+function EditContactModal({ tenantId, token, contact, onClose, onSaved }: {
+  tenantId: string;
+  token: string;
+  contact: Contact;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [firstName, setFirstName] = useState(contact.firstName);
+  const [lastName, setLastName] = useState(contact.lastName ?? '');
+  const [phone, setPhone] = useState(contact.phone);
+  const [email, setEmail] = useState(contact.email ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await updateContact(tenantId, contact.id, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim() || undefined,
+        phone: normalizePhone(phone.trim()),
+        email: email.trim() || undefined,
+      }, token);
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => !saving && onClose()}>
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold text-slate-800 text-base mb-4">Editar contacto</h3>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
+              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Apellido</label>
+              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Teléfono *</label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} disabled={saving}
+              className="flex-1 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              Cancelar
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main client component ────────────────────────────────────────────────────
 
 export default function ContactsClient({ tenantId, token, initialContacts }: {
@@ -266,6 +345,7 @@ export default function ContactsClient({ tenantId, token, initialContacts }: {
   const [showCsv, setShowCsv] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [confirmContact, setConfirmContact] = useState<Contact | null>(null);
+  const [editContact, setEditContact] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const clearToast = useCallback(() => setToast(null), []);
@@ -378,12 +458,20 @@ export default function ContactsClient({ tenantId, token, initialContacts }: {
                   <td className="px-4 py-3 text-slate-500 font-mono text-xs">{c.phone}</td>
                   <td className="px-4 py-3 text-slate-400 text-xs hidden sm:table-cell">{c.email ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <button onClick={() => setConfirmContact(c)} title="Borrar"
-                      className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditContact(c)} title="Editar"
+                        className="p-1.5 rounded-md text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                      </button>
+                      <button onClick={() => setConfirmContact(c)} title="Borrar"
+                        className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -394,6 +482,20 @@ export default function ContactsClient({ tenantId, token, initialContacts }: {
 
       {showCsv && (
         <CsvModal tenantId={tenantId} token={token} onClose={() => setShowCsv(false)} onImported={onImported} />
+      )}
+
+      {editContact && (
+        <EditContactModal
+          tenantId={tenantId}
+          token={token}
+          contact={editContact}
+          onClose={() => setEditContact(null)}
+          onSaved={() => {
+            setEditContact(null);
+            setToast({ message: 'Contacto actualizado', type: 'success' });
+            refresh();
+          }}
+        />
       )}
 
       {confirmContact && (

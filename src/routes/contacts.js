@@ -61,6 +61,17 @@ router.get('/:contactId', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * PATCH /api/tenants/:tenantId/contacts/:contactId
+ * Updates a contact's fields.
+ */
+router.patch('/:contactId', asyncHandler(async (req, res) => {
+  const { tenantId, contactId } = req.params;
+  const { firstName, lastName, phone, email } = req.body;
+  const contact = await contactService.updateContact(tenantId, contactId, { firstName, lastName, phone, email });
+  res.json({ contact });
+}));
+
+/**
  * DELETE /api/tenants/:tenantId/contacts/:contactId
  * Deletes a contact (only if not linked to any campaign).
  */

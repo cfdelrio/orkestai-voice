@@ -64,12 +64,27 @@ function StepRow({
               : 'border-slate-200 text-slate-500 hover:border-slate-300'
           }`}
         >
-          {open ? '↑ Cerrar' : hasOverride ? '✓ Voz propia' : '+ Personalizar voz'}
+          {open ? '↑ Cerrar' : hasOverride ? '✓ Voz propia' : '+ Editar'}
         </button>
       </div>
 
       {open && (
         <div className="px-4 py-4 space-y-3 border-t border-slate-100">
+          {/* Text editing — always shown regardless of ttsProvider */}
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-1.5">Texto</p>
+            <textarea
+              value={step.text}
+              onChange={(e) => onChange({ text: e.target.value })}
+              rows={2}
+              placeholder="Texto que se leerá en este paso…"
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Podés usar variables como <code className="bg-slate-100 px-1 rounded">{'{firstName}'}</code>. Los cambios regeneran el audio al guardar.
+            </p>
+          </div>
+
           {ttsProvider === 'openai' ? (
             <>
               <div>
@@ -197,9 +212,9 @@ export function FlowStepVoiceEditor({ campaignId, initialSteps, ttsProvider }: P
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-sm font-semibold text-slate-700">Voz por step</h2>
+        <h2 className="text-sm font-semibold text-slate-700">Steps del flow</h2>
         <div className="flex items-center gap-2">
-          {saved && <span className="text-xs text-green-600">Guardado</span>}
+          {saved && <span className="text-xs text-green-600">Guardado · audio regenerado</span>}
           {stepsWithOverride > 0 && !open && (
             <span className="text-xs text-indigo-600">{stepsWithOverride} step{stepsWithOverride !== 1 ? 's' : ''} con voz propia</span>
           )}
@@ -214,7 +229,7 @@ export function FlowStepVoiceEditor({ campaignId, initialSteps, ttsProvider }: P
 
       {!open && (
         <p className="text-xs text-slate-400 mt-1">
-          Asigná una voz o instrucciones de pronunciación distintas a cada paso del flow.
+          Editá el texto o ajustá la voz de cada paso. Al guardar se regeneran los audios automáticamente.
         </p>
       )}
 
