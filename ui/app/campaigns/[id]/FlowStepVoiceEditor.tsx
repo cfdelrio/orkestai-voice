@@ -15,6 +15,14 @@ const VOICE_OPTIONS = [
   { value: 'fable',   label: 'Fable',   desc: 'Masculina · narrativa' },
 ];
 
+const SUGGESTIONS = [
+  { label: 'Acento rioplatense',    text: 'Hablá con acento rioplatense marcado.' },
+  { label: 'Hablar despacio',       text: 'Hablá despacio y con pausas claras.' },
+  { label: 'Tono cálido',           text: 'Tono cálido, cercano y amigable.' },
+  { label: 'Pronunciar pausas',     text: 'Hacé una pausa breve antes de cada dato importante.' },
+  { label: 'Entusiasta moderado',   text: 'Con entusiasmo moderado, positivo pero natural.' },
+];
+
 const STEP_TYPE_LABEL: Record<string, string> = {
   say: 'Decir',
   dtmf_question: 'Pregunta DTMF',
@@ -98,14 +106,27 @@ function StepRow({
               </div>
 
               <div>
-                <p className="text-xs font-medium text-slate-600 mb-1">Instrucciones de pronunciación</p>
+                <p className="text-xs font-medium text-slate-600 mb-1.5">Instrucciones de expresión para este paso</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => onChange({ voiceInstructions: step.voiceInstructions ? `${step.voiceInstructions.trim()} ${s.text}` : s.text })}
+                      className="text-xs px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                    >
+                      + {s.label}
+                    </button>
+                  ))}
+                </div>
                 <textarea
                   value={step.voiceInstructions ?? ''}
                   onChange={(e) => onChange({ voiceInstructions: e.target.value || undefined })}
                   rows={2}
-                  placeholder="Ej: Pronunciá 'García' con acento en la a. Hablá despacio en este paso."
-                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none font-mono"
+                  placeholder="Ej: Hablá más despacio en este paso. Pronunciá 'García' con acento en la a."
+                  className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
                 />
+                <p className="text-xs text-slate-400 mt-1">Estas instrucciones aplican solo a este paso. Usá lenguaje natural.</p>
               </div>
 
               {step.text && (
