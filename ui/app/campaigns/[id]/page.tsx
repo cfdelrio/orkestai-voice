@@ -7,6 +7,7 @@ import { CampaignActions } from './CampaignActions';
 import { CampaignCharts } from './CampaignCharts';
 import { AddRecipientsModal } from './AddRecipientsModal';
 import { VoiceInstructionsEditor } from './VoiceInstructionsEditor';
+import { FlowStepVoiceEditor } from './FlowStepVoiceEditor';
 import { FeedConfigEditor } from './FeedConfigEditor';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -183,6 +184,15 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
         initialTtsProvider={String(campaign.metadata?.ttsProvider ?? 'openai')}
         initialElevenLabsVoiceId={String(campaign.metadata?.elevenLabsVoiceId ?? 'ByVRQtaK1WDOvTmP1PKO')}
       />
+
+      {/* Per-step voice overrides */}
+      {flow && flow.steps.length > 0 && (
+        <FlowStepVoiceEditor
+          campaignId={campaign.id}
+          initialSteps={flow.steps}
+          ttsProvider={String(campaign.metadata?.ttsProvider ?? 'openai')}
+        />
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

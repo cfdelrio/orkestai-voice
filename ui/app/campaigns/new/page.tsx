@@ -41,6 +41,61 @@ const VOICE_OPTIONS = [
   { value: 'fable',   label: 'Fable',   desc: 'Masculina · narrativa' },
 ];
 
+function StepVoicePanel({
+  step, index, ttsProvider, voiceOptions, onUpdate,
+}: {
+  step: FlowStep;
+  index: number;
+  ttsProvider: string;
+  voiceOptions: { value: string; label: string; desc: string }[];
+  onUpdate: (i: number, patch: Partial<FlowStep>) => void;
+}) {
+  const [open, setOpen] = useState(!!(step.voice || step.voiceInstructions));
+  const hasOverride = !!(step.voice || step.voiceInstructions);
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`text-xs font-medium px-2.5 py-1 rounded-md border transition-colors ${
+          hasOverride
+            ? 'border-indigo-300 text-indigo-600 bg-indigo-50'
+            : 'border-slate-200 text-slate-400 hover:border-slate-300'
+        }`}
+      >
+        {hasOverride ? '✓ Voz propia' : '+ Personalizar voz de este paso'}
+      </button>
+      {open && ttsProvider === 'openai' && (
+        <div className="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+          <div className="grid grid-cols-4 gap-1.5">
+            <button type="button" onClick={() => onUpdate(index, { voice: undefined })}
+              className={`px-2 py-1.5 rounded border text-xs transition-colors ${!step.voice ? 'border-slate-400 bg-white font-medium' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+              Heredar
+            </button>
+            {voiceOptions.map((v) => (
+              <button key={v.value} type="button" onClick={() => onUpdate(index, { voice: v.value })}
+                className={`px-2 py-1.5 rounded border text-xs transition-colors ${step.voice === v.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={step.voiceInstructions ?? ''}
+            onChange={(e) => onUpdate(index, { voiceInstructions: e.target.value || undefined })}
+            rows={2}
+            placeholder="Instrucciones de pronunciación para este paso…"
+            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none font-mono"
+          />
+        </div>
+      )}
+      {open && ttsProvider !== 'openai' && (
+        <p className="mt-1 text-xs text-slate-400">Voz ElevenLabs por step disponible en la edición de la campaña.</p>
+      )}
+    </div>
+  );
+}
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const { getToken } = useAuth();
@@ -446,13 +501,21 @@ export default function NewCampaignPage() {
                 />
                 {s.text.trim() && s.type !== 'speech_question' && (
                   <VoicePreviewPlayer
-                    voiceInstructions={ttsProvider === 'openai' ? voiceInstructions : undefined}
-                    voice={ttsProvider === 'openai' ? voice : undefined}
+                    voiceInstructions={ttsProvider === 'openai' ? (s.voiceInstructions ?? voiceInstructions) : undefined}
+                    voice={ttsProvider === 'openai' ? (s.voice ?? voice) : undefined}
                     ttsProvider={ttsProvider}
-                    elevenLabsVoiceId={ttsProvider === 'elevenlabs' ? elevenLabsVoiceId : undefined}
+                    elevenLabsVoiceId={ttsProvider === 'elevenlabs' ? (s.elevenLabsVoiceId ?? elevenLabsVoiceId) : undefined}
                     defaultText={s.text}
                   />
                 )}
+                {/* Per-step voice override */}
+                <StepVoicePanel
+                  step={s}
+                  index={i}
+                  ttsProvider={ttsProvider}
+                  voiceOptions={VOICE_OPTIONS}
+                  onUpdate={updateFlowStep}
+                />
                 {s.type === 'dtmf_question' && (
                   <div className="mt-2 flex gap-3 text-xs text-slate-500">
                     <label className="flex items-center gap-1">

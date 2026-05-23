@@ -183,7 +183,11 @@ async function generateAudioForRecipient(recipientId, steps, vars, instructions,
   const results = await Promise.allSettled(
     steps.map((step) => {
       const text = interpolateTemplate(step.text || '', vars);
-      return generateAudio(recipientId, step.id, text, instructions, voice, ttsProvider, elevenLabsVoiceId);
+      // Per-step overrides fall back to campaign-level settings
+      const stepVoice = step.voice || voice;
+      const stepInstructions = step.voiceInstructions || instructions;
+      const stepElevenLabsVoiceId = step.elevenLabsVoiceId || elevenLabsVoiceId;
+      return generateAudio(recipientId, step.id, text, stepInstructions, stepVoice, ttsProvider, stepElevenLabsVoiceId);
     })
   );
 
