@@ -238,3 +238,55 @@ export const upsertFeedConfig = (
 
 export const deleteFeedConfig = (campaignId: string, token?: string) =>
   apiFetch<{ deleted: boolean }>(`/api/campaigns/${campaignId}/feed-config`, { method: 'DELETE' }, token);
+
+// ─── API Keys ─────────────────────────────────────────────────────────────────
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+export const listApiKeys = (tenantId: string, token: string) =>
+  apiFetch<{ apiKeys: ApiKey[]; count: number }>(`/api/tenants/${tenantId}/api-keys`, undefined, token);
+
+export const createApiKey = (tenantId: string, name: string, token: string) =>
+  apiFetch<{ apiKey: ApiKey; key: string }>(`/api/tenants/${tenantId}/api-keys`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  }, token);
+
+export const deleteApiKey = (tenantId: string, keyId: string, token: string) =>
+  apiFetch<{ deleted: boolean }>(`/api/tenants/${tenantId}/api-keys/${keyId}`, { method: 'DELETE' }, token);
+
+// ─── Webhook Endpoints ────────────────────────────────────────────────────────
+
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  events: string[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const listWebhookEndpoints = (tenantId: string, token: string) =>
+  apiFetch<{ endpoints: WebhookEndpoint[]; validEvents: string[]; count: number }>(
+    `/api/tenants/${tenantId}/webhook-endpoints`, undefined, token,
+  );
+
+export const createWebhookEndpoint = (tenantId: string, data: { url: string; events: string[]; enabled?: boolean }, token: string) =>
+  apiFetch<{ endpoint: WebhookEndpoint & { secret: string } }>(`/api/tenants/${tenantId}/webhook-endpoints`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, token);
+
+export const updateWebhookEndpoint = (tenantId: string, endpointId: string, data: Partial<Pick<WebhookEndpoint, 'url' | 'events' | 'enabled'>>, token: string) =>
+  apiFetch<{ endpoint: WebhookEndpoint }>(`/api/tenants/${tenantId}/webhook-endpoints/${endpointId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, token);
+
+export const deleteWebhookEndpoint = (tenantId: string, endpointId: string, token: string) =>
+  apiFetch<{ deleted: boolean }>(`/api/tenants/${tenantId}/webhook-endpoints/${endpointId}`, { method: 'DELETE' }, token);
