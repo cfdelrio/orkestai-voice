@@ -25,6 +25,8 @@ const usersRouter = require('./routes/users');
 const onboardingRouter = require('./routes/onboarding');
 const audioRouter = require('./routes/audio');
 const publicRouter = require('./routes/public');
+const apiKeysRouter = require('./routes/apiKeys');
+const webhookEndpointsRouter = require('./routes/webhookEndpoints');
 
 const app = express();
 const logger = createLogger('App');
@@ -85,6 +87,12 @@ app.use('/api/audio', audioRouter);
 
 // Public campaign feeds (no auth, rate limited)
 app.use('/api/public', publicRouter);
+
+// API keys (M2M auth)
+app.use('/api/tenants/:tenantId/api-keys', apiKeysRouter);
+
+// Outgoing webhook endpoints
+app.use('/api/tenants/:tenantId/webhook-endpoints', webhookEndpointsRouter);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

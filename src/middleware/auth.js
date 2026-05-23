@@ -1,6 +1,7 @@
 const { verifyToken } = require('@clerk/backend');
 const { PrismaClient } = require('@prisma/client');
 const { createLogger } = require('./logger');
+const { findTenantByRawKey } = require('../services/apiKeyService');
 
 const prisma = new PrismaClient();
 const logger = createLogger('Auth');
@@ -41,7 +42,7 @@ async function verifyClerkToken(token) {
   return payload; // { sub: clerkUserId, ... }
 }
 
-// Full auth: verifies JWT and looks up User in DB
+// Full auth: supports both Clerk JWT and API key (ok_ prefix)
 async function requireAuth(req, res, next) {
   if (isPublic(req.path)) return next();
 
@@ -50,6 +51,23 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: { message: 'Missing authorization header' } });
   }
 
+  // API key path: tokens starting with "ok_" are machine-to-machine keys
+  if (token.startsWith('ok_')) {
+    try {
+      const record = await findTenantByRawKey(token);
+      if (!record) {
+        return res.status(401).json({ error: { message: 'Invalid API key' } });
+      }
+      req.tenantId = record.tenantId;
+      req.apiKeyAuth = true;
+      return next();
+    } catch (err) {
+      logger.warn('API key auth failed', { error: err.message });
+      return res.status(401).json({ error: { message: 'Invalid API key' } });
+    }
+  }
+
+  // Clerk JWT path
   try {
     const payload = await verifyClerkToken(token);
     req.clerkUserId = payload.sub;
