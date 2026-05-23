@@ -31,7 +31,7 @@ function timingSafeCompare(a, b) {
  * Idempotent auto-registration for internal services (e.g. ENGAGE).
  * Auth: X-Shared-Secret header == process.env.ENGAGE_SHARED_SECRET
  *
- * Body: { serviceName, webhookUrl, webhookEvents? }
+ * Body: { serviceName, tenantId, webhookUrl, webhookEvents? }
  * Response: { apiKey, webhookSecret, tenantId }
  */
 router.post('/service-accounts/register', asyncHandler(async (req, res) => {
@@ -49,10 +49,13 @@ router.post('/service-accounts/register', asyncHandler(async (req, res) => {
     return res.status(401).json({ error: { message: 'Invalid shared secret' } });
   }
 
-  const { serviceName, webhookUrl, webhookEvents } = req.body;
+  const { serviceName, tenantId, webhookUrl, webhookEvents } = req.body;
 
   if (!serviceName || typeof serviceName !== 'string' || !serviceName.trim()) {
     return res.status(400).json({ error: { message: '"serviceName" is required' } });
+  }
+  if (!tenantId || typeof tenantId !== 'string' || !tenantId.trim()) {
+    return res.status(400).json({ error: { message: '"tenantId" is required' } });
   }
   if (!webhookUrl || typeof webhookUrl !== 'string') {
     return res.status(400).json({ error: { message: '"webhookUrl" is required' } });
@@ -61,16 +64,9 @@ router.post('/service-accounts/register', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: { message: '"webhookUrl" must be a valid HTTP/HTTPS URL' } });
   }
 
-  const tenantId = process.env.ENGAGE_VOICE_TENANT_ID;
-  if (!tenantId) {
-    logger.warn('ENGAGE_VOICE_TENANT_ID not configured');
-    return res.status(503).json({ error: { message: 'ENGAGE_VOICE_TENANT_ID not configured on this server' } });
-  }
-
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
   if (!tenant) {
-    logger.error('ENGAGE_VOICE_TENANT_ID points to non-existent tenant', { tenantId });
-    return res.status(503).json({ error: { message: 'Tenant not found — check ENGAGE_VOICE_TENANT_ID' } });
+    return res.status(404).json({ error: { message: `Tenant not found: ${tenantId}` } });
   }
 
   const keyName = `${serviceName.trim()} (auto)`;
