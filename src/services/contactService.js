@@ -155,7 +155,8 @@ async function updateContact(tenantId, contactId, { firstName, lastName, phone, 
   return contact;
 }
 
-
+/**
+ * Deletes a contact. Throws 400 if the contact is linked to any campaign.
  *
  * @param {string} tenantId
  * @param {string} contactId
