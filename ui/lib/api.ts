@@ -33,6 +33,9 @@ export interface FlowStep {
   maxDigits?: number;
   maxLength?: number;
   timeout?: number;
+  voice?: string;
+  elevenLabsVoiceId?: string;
+  voiceInstructions?: string;
 }
 
 export interface VoiceFlow {
