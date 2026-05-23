@@ -44,7 +44,13 @@ async function processCallJob(job) {
 
   // Pre-generate TTS audio for all flow steps before initiating the call.
   // This ensures Twilio can fetch <Play> URLs the moment the call connects.
-  if (campaign.flow?.steps && process.env.OPENAI_API_KEY) {
+  const ttsProvider       = campaign.metadata?.ttsProvider       || 'openai';
+  const elevenLabsVoiceId = campaign.metadata?.elevenLabsVoiceId || undefined;
+  const hasAudioKey = ttsProvider === 'elevenlabs'
+    ? !!process.env.ELEVENLABS_API_KEY
+    : !!process.env.OPENAI_API_KEY;
+
+  if (campaign.flow?.steps && hasAudioKey) {
     const campaignVars = campaign.variables && typeof campaign.variables === 'object'
       ? campaign.variables : {};
     const vars = {
@@ -56,15 +62,14 @@ async function processCallJob(job) {
     const voiceInstructions = campaign.tenant?.metadata?.voiceInstructions
       || campaign.metadata?.voiceInstructions
       || undefined;
-    const voice              = campaign.metadata?.voice              || undefined;
-    const ttsProvider        = campaign.metadata?.ttsProvider        || 'openai';
-    const elevenLabsVoiceId  = campaign.metadata?.elevenLabsVoiceId  || undefined;
+    const voice = campaign.metadata?.voice || undefined;
     try {
       await generateAudioForRecipient(recipientId, campaign.flow.steps, vars, voiceInstructions, voice, ttsProvider, elevenLabsVoiceId);
     } catch (audioErr) {
       // Non-fatal: fall back to <Say> in TwiML if audio generation fails
       logger.warn('Audio pre-generation failed — will use Say fallback', {
         recipientId,
+        ttsProvider,
         error: audioErr.message,
       });
     }

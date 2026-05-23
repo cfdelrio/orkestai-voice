@@ -11,16 +11,18 @@ datasource db {
 }
 
 model Tenant {
-  id             String           @id @default(uuid())
-  name           String
-  slug           String           @unique
-  metadata       Json             @default("{}")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  providerConfig ProviderConfig[]
-  campaigns      Campaign[]
-  contacts       Contact[]
-  users          User[]
+  id               String            @id @default(uuid())
+  name             String
+  slug             String            @unique
+  metadata         Json              @default("{}")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  providerConfig   ProviderConfig[]
+  campaigns        Campaign[]
+  contacts         Contact[]
+  users            User[]
+  apiKeys          ApiKey[]
+  webhookEndpoints WebhookEndpoint[]
 }
 
 model User {
@@ -143,4 +145,26 @@ model Response {
   input     String   // DTMF digit pressed
   value     String?  // mapped value (e.g. "yes", "no")
   createdAt DateTime @default(now())
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  keyHash    String    @unique
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model WebhookEndpoint {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  url       String
+  secret    String
+  events    Json     @default("[]")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

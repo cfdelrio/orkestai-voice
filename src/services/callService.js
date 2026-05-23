@@ -13,6 +13,7 @@ const { getProviderConfigForTenant } = require('./tenantService');
 const { createProvider } = require('./providerFactory');
 const { config } = require('../config/env');
 const { callQueue } = require('../queues/index');
+const webhookService = require('./webhookService');
 
 const prisma = new PrismaClient();
 const logger = createLogger('CallService');
@@ -151,14 +152,14 @@ async function handleWebhookEvent(event) {
     callUpdateData.endedAt = new Date();
   }
 
-  await prisma.call.update({
+  const updatedCall = await prisma.call.update({
     where: { id: call.id },
     data: callUpdateData,
   });
 
   // ─── Save DTMF response ────────────────────────────────────────────────────
+  let savedResponse = null;
   if (eventType === 'dtmf' && dtmfDigit !== null) {
-    // Try to resolve the semantic value from the flow's step options
     let value = null;
 
     if (stepId) {
@@ -174,7 +175,7 @@ async function handleWebhookEvent(event) {
       }
     }
 
-    await prisma.response.create({
+    savedResponse = await prisma.response.create({
       data: {
         callId: call.id,
         stepId: stepId || 'unknown',
@@ -189,6 +190,61 @@ async function handleWebhookEvent(event) {
       dtmfDigit,
       value,
     });
+  }
+
+  // ─── Dispatch outgoing webhooks (fire-and-forget) ─────────────────────────
+  const tenantId = call.campaign.tenantId;
+  const callPayload = {
+    callId: call.id,
+    campaignId: call.campaignId,
+    recipientId: call.recipientId,
+    providerCallId: call.providerCallId,
+    status: updatedCall.status,
+    startedAt: updatedCall.startedAt,
+    endedAt: updatedCall.endedAt,
+    duration: updatedCall.duration,
+  };
+
+  if (status === 'answered') {
+    webhookService.dispatch(tenantId, 'call.answered', callPayload).catch(() => {});
+  } else if (status === 'completed') {
+    const responses = await prisma.response.findMany({ where: { callId: call.id } });
+    webhookService.dispatch(tenantId, 'call.completed', { ...callPayload, responses }).catch(() => {});
+    maybeDispatchCampaignCompleted(call.campaignId, tenantId);
+  } else if (status === 'failed') {
+    webhookService.dispatch(tenantId, 'call.failed', callPayload).catch(() => {});
+    maybeDispatchCampaignCompleted(call.campaignId, tenantId);
+  } else if (status === 'no_answer') {
+    webhookService.dispatch(tenantId, 'call.no_answer', callPayload).catch(() => {});
+    maybeDispatchCampaignCompleted(call.campaignId, tenantId);
+  }
+}
+
+async function maybeDispatchCampaignCompleted(campaignId, tenantId) {
+  try {
+    const pending = await prisma.campaignRecipient.count({
+      where: { campaignId, status: 'pending' },
+    });
+    if (pending > 0) return;
+
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { id: true, name: true, status: true, startedAt: true, completedAt: true },
+    });
+    if (!campaign || campaign.status === 'completed') return;
+
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'completed', completedAt: new Date() },
+    });
+
+    webhookService.dispatch(tenantId, 'campaign.completed', {
+      campaignId,
+      campaignName: campaign.name,
+      completedAt: new Date().toISOString(),
+    }).catch(() => {});
+  } catch (err) {
+    logger.warn('maybeDispatchCampaignCompleted failed', { campaignId, error: err.message });
   }
 }
 

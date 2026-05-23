@@ -15,6 +15,10 @@ const { asyncHandler, badRequest } = require('../middleware/errorHandler');
 const campaignService = require('../services/campaignService');
 const callService = require('../services/callService');
 const publicFeedService = require('../services/publicFeedService');
+const { deleteAudioForCampaign } = require('../services/audioService');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
 
 // ─── Tenant-scoped campaign routes ────────────────────────────────────────────
 
@@ -171,6 +175,39 @@ campaignRouter.patch('/:campaignId', asyncHandler(async (req, res) => {
   });
 
   res.json({ campaign });
+}));
+
+/**
+ * POST /api/campaigns/:campaignId/clear-audio
+ * Deletes all pre-generated audio files for the campaign so the next batch
+ * of calls re-generates them with the current voice settings.
+ */
+campaignRouter.post('/:campaignId/clear-audio', asyncHandler(async (req, res) => {
+  const { campaignId } = req.params;
+  const campaign = await campaignService.getCampaignById(campaignId);
+
+  if (!campaign.flow?.steps?.length) {
+    return res.json({ cleared: 0, message: 'No flow steps — nothing to clear' });
+  }
+
+  const recipients = await prisma.campaignRecipient.findMany({
+    where: { campaignId },
+    select: { id: true },
+  });
+
+  if (recipients.length === 0) {
+    return res.json({ cleared: 0, message: 'No recipients — nothing to clear' });
+  }
+
+  const stepIds = campaign.flow.steps.map((s) => s.id);
+  deleteAudioForCampaign(recipients.map((r) => r.id), stepIds);
+
+  res.json({
+    cleared: recipients.length * stepIds.length,
+    recipients: recipients.length,
+    steps: stepIds.length,
+    message: 'Audio cache cleared. Next calls will regenerate audio with current voice settings.',
+  });
 }));
 
 /**
