@@ -164,6 +164,12 @@ export const createContact = (tenantId: string, data: { firstName: string; lastN
     body: JSON.stringify(data),
   }, token);
 
+export const updateContact = (tenantId: string, contactId: string, data: { firstName?: string; lastName?: string; phone?: string; email?: string }, token?: string) =>
+  apiFetch<{ contact: Contact }>(`/api/tenants/${tenantId}/contacts/${contactId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, token);
+
 export const deleteContact = (tenantId: string, contactId: string, token?: string) =>
   apiFetch<{ deleted: boolean }>(`/api/tenants/${tenantId}/contacts/${contactId}`, { method: 'DELETE' }, token);
 

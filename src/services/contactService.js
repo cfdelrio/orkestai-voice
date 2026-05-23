@@ -124,7 +124,38 @@ async function validateContactsForTenant(tenantId, contactIds) {
 }
 
 /**
- * Deletes a contact. Throws 400 if the contact is linked to any campaign.
+ * Updates a contact's editable fields.
+ *
+ * @param {string} tenantId
+ * @param {string} contactId
+ * @param {Object} data
+ */
+async function updateContact(tenantId, contactId, { firstName, lastName, phone, email }) {
+  await getContactById(tenantId, contactId);
+
+  const updateData = {};
+
+  if (firstName !== undefined) {
+    if (!firstName.trim()) throw badRequest('firstName no puede estar vacío');
+    updateData.firstName = firstName.trim();
+  }
+  if (lastName !== undefined) updateData.lastName = lastName?.trim() || null;
+  if (phone !== undefined) {
+    if (!E164_REGEX.test(phone)) {
+      throw badRequest(`Teléfono inválido "${phone}". Formato E.164 requerido (ej: +5491122334455)`);
+    }
+    updateData.phone = phone;
+  }
+  if (email !== undefined) updateData.email = email?.trim() || null;
+
+  if (Object.keys(updateData).length === 0) return getContactById(tenantId, contactId);
+
+  const contact = await prisma.contact.update({ where: { id: contactId }, data: updateData });
+  logger.info('Contact updated', { contactId, tenantId });
+  return contact;
+}
+
+
  *
  * @param {string} tenantId
  * @param {string} contactId
@@ -147,5 +178,6 @@ module.exports = {
   listContacts,
   getContactById,
   validateContactsForTenant,
+  updateContact,
   deleteContact,
 };
