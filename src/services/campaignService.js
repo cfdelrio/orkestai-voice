@@ -336,24 +336,26 @@ async function getCampaignResults(campaignId) {
     throw notFound('Campaign', campaignId);
   }
 
-  // Aggregate call status counts
+  // Aggregate call status counts (real calls only)
   const callStatusCounts = {};
   const responsesByStep = {};
+  const sandboxCallStatusCounts = {};
 
   for (const recipient of campaign.recipients) {
     const lastCall = recipient.calls[0];
     if (lastCall) {
-      const st = lastCall.status;
-      callStatusCounts[st] = (callStatusCounts[st] || 0) + 1;
+      if (lastCall.metadata?.sandbox) {
+        sandboxCallStatusCounts[lastCall.status] = (sandboxCallStatusCounts[lastCall.status] || 0) + 1;
+      } else {
+        const st = lastCall.status;
+        callStatusCounts[st] = (callStatusCounts[st] || 0) + 1;
 
-      // Group responses by stepId + value
-      for (const response of lastCall.responses) {
-        const key = response.stepId;
-        if (!responsesByStep[key]) {
-          responsesByStep[key] = {};
+        for (const response of lastCall.responses) {
+          const key = response.stepId;
+          if (!responsesByStep[key]) responsesByStep[key] = {};
+          const val = response.value || response.input;
+          responsesByStep[key][val] = (responsesByStep[key][val] || 0) + 1;
         }
-        const val = response.value || response.input;
-        responsesByStep[key][val] = (responsesByStep[key][val] || 0) + 1;
       }
     }
   }
@@ -362,6 +364,7 @@ async function getCampaignResults(campaignId) {
   const pendingCount = campaign.recipients.filter((r) => r.status === 'pending').length;
   const calledCount = campaign.recipients.filter((r) => r.status === 'called').length;
   const failedCount = campaign.recipients.filter((r) => r.status === 'failed').length;
+  const sandboxCount = campaign.recipients.filter((r) => ['sandbox', 'sandbox_pending'].includes(r.status)).length;
 
   return {
     campaign: {
@@ -405,9 +408,14 @@ async function getCampaignResults(campaignId) {
         pending: pendingCount,
         called: calledCount,
         failed: failedCount,
+        sandbox: sandboxCount,
       },
       callsByStatus: callStatusCounts,
       responsesByStep,
+      sandbox: {
+        callsByStatus: sandboxCallStatusCounts,
+        count: sandboxCount,
+      },
     },
   };
 }
