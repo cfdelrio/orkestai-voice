@@ -123,7 +123,11 @@ campaignRouter.post('/:campaignId/recipients', asyncHandler(async (req, res) => 
  */
 campaignRouter.post('/:campaignId/start', asyncHandler(async (req, res) => {
   const { campaignId } = req.params;
-  const result = await callService.startCampaign(campaignId);
+  const { sandbox = false, limit = 5 } = req.body ?? {};
+  const result = await callService.startCampaign(campaignId, {
+    sandbox: !!sandbox,
+    limit: Math.min(Math.max(1, Number(limit) || 5), 50),
+  });
   res.json(result);
 }));
 

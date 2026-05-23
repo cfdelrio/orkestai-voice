@@ -18,15 +18,16 @@ function Toast({ message, type, onDone }: { message: string; type: 'success' | '
   );
 }
 
-function ConfirmModal({ title, description, confirmLabel, confirmClass, onConfirm, onCancel, loading }: {
+function ConfirmModal({ title, description, confirmLabel, confirmClass, onConfirm, onCancel, loading, children }: {
   title: string; description: string; confirmLabel: string; confirmClass: string;
-  onConfirm: () => void; onCancel: () => void; loading: boolean;
+  onConfirm: () => void; onCancel: () => void; loading: boolean; children?: React.ReactNode;
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={onCancel}>
       <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-semibold text-slate-800 text-base mb-2">{title}</h3>
         <p className="text-sm text-slate-500">{description}</p>
+        {children}
         <div className="flex gap-3 mt-5">
           <button onClick={onCancel} disabled={loading}
             className="flex-1 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
@@ -43,15 +44,17 @@ function ConfirmModal({ title, description, confirmLabel, confirmClass, onConfir
   );
 }
 
-export function CampaignActions({ campaignId, status, pendingCount = 0 }: {
+export function CampaignActions({ campaignId, status, pendingCount = 0, totalCount = 0 }: {
   campaignId: string;
   status: string;
   pendingCount?: number;
+  totalCount?: number;
 }) {
   const { getToken } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState<'start' | 'pause' | 'retry' | null>(null);
+  const [modal, setModal] = useState<'start' | 'sandbox' | 'pause' | 'retry' | null>(null);
+  const [sandboxLimit, setSandboxLimit] = useState(5);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const clearToast = useCallback(() => setToast(null), []);
 
@@ -70,17 +73,34 @@ export function CampaignActions({ campaignId, status, pendingCount = 0 }: {
     }
   }
 
+  const isSandboxRunning = status === 'sandbox';
+  const isLaunchable = ['draft', 'completed'].includes(status);
+  const isSandboxable = ['draft', 'sandbox', 'completed'].includes(status);
   const showRetry = pendingCount > 0 && ['completed', 'paused'].includes(status);
 
   return (
     <>
       <div className="flex items-center gap-3">
-        {status === 'draft' && (
+        {isSandboxRunning && (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+            🧪 Sandbox en curso…
+          </span>
+        )}
+
+        {isSandboxable && (
+          <button onClick={() => setModal('sandbox')} disabled={loading}
+            className="text-sm font-medium px-4 py-2 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors">
+            🧪 Probar
+          </button>
+        )}
+
+        {isLaunchable && (
           <button onClick={() => setModal('start')} disabled={loading}
             className="text-sm font-medium px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
             📞 Lanzar campaña
           </button>
         )}
+
         {status === 'running' && (
           <button onClick={() => setModal('pause')} disabled={loading}
             className="text-sm font-medium px-4 py-2 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors">
@@ -101,10 +121,40 @@ export function CampaignActions({ campaignId, status, pendingCount = 0 }: {
         )}
       </div>
 
+      {modal === 'sandbox' && (
+        <ConfirmModal
+          title="Prueba sandbox"
+          description="Se llamará a un grupo reducido de destinatarios para verificar el flow. Las llamadas quedan marcadas como sandbox y no cuentan en las estadísticas reales."
+          confirmLabel="🧪 Probar"
+          confirmClass="bg-amber-500 text-white hover:bg-amber-600"
+          onConfirm={() => run(async () => {
+            const t = (await getToken()) ?? undefined;
+            await startCampaign(campaignId, t, { sandbox: true, limit: sandboxLimit });
+          }, `Sandbox iniciado con ${sandboxLimit} contacto${sandboxLimit !== 1 ? 's' : ''}`)}
+          onCancel={() => !loading && setModal(null)}
+          loading={loading}
+        >
+          <div className="mt-4 flex items-center gap-3">
+            <label className="text-sm text-slate-600 shrink-0">Contactos a llamar</label>
+            <input
+              type="number"
+              min={1}
+              max={Math.min(50, totalCount || 50)}
+              value={sandboxLimit}
+              onChange={(e) => setSandboxLimit(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+              className="w-20 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-300"
+            />
+            {totalCount > 0 && (
+              <span className="text-xs text-slate-400">de {totalCount} total</span>
+            )}
+          </div>
+        </ConfirmModal>
+      )}
+
       {modal === 'start' && (
         <ConfirmModal
           title="Lanzar campaña"
-          description="Se iniciarán las llamadas a todos los destinatarios. Una vez lanzada podés pausarla pero no deshacerla."
+          description="Se iniciarán las llamadas a todos los destinatarios pendientes. Las llamadas sandbox previas también se incluirán."
           confirmLabel="📞 Sí, lanzar"
           confirmClass="bg-indigo-600 text-white hover:bg-indigo-700"
           onConfirm={() => run(async () => { const t = (await getToken()) ?? undefined; await startCampaign(campaignId, t); }, 'Campaña lanzada')}

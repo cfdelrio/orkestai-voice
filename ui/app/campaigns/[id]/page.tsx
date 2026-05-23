@@ -10,19 +10,35 @@ import { VoiceInstructionsEditor } from './VoiceInstructionsEditor';
 import { FeedConfigEditor } from './FeedConfigEditor';
 
 const STATUS_COLORS: Record<string, string> = {
-  draft:      'bg-slate-100 text-slate-600',
-  running:    'bg-blue-100 text-blue-700',
-  active:     'bg-blue-100 text-blue-700',
-  paused:     'bg-amber-100 text-amber-700',
-  scheduled:  'bg-purple-100 text-purple-700',
-  completed:  'bg-green-100 text-green-700',
-  failed:     'bg-red-100 text-red-700',
-  initiated:  'bg-slate-100 text-slate-600',
-  ringing:    'bg-amber-100 text-amber-700',
-  answered:   'bg-blue-100 text-blue-700',
-  no_answer:  'bg-orange-100 text-orange-700',
-  pending:    'bg-slate-100 text-slate-500',
-  called:     'bg-green-100 text-green-700',
+  draft:           'bg-slate-100 text-slate-600',
+  sandbox:         'bg-amber-100 text-amber-700',
+  running:         'bg-blue-100 text-blue-700',
+  active:          'bg-blue-100 text-blue-700',
+  paused:          'bg-amber-100 text-amber-700',
+  scheduled:       'bg-purple-100 text-purple-700',
+  completed:       'bg-green-100 text-green-700',
+  failed:          'bg-red-100 text-red-700',
+  initiated:       'bg-slate-100 text-slate-600',
+  ringing:         'bg-amber-100 text-amber-700',
+  answered:        'bg-blue-100 text-blue-700',
+  no_answer:       'bg-orange-100 text-orange-700',
+  pending:         'bg-slate-100 text-slate-500',
+  called:          'bg-green-100 text-green-700',
+  sandbox_pending: 'bg-amber-50 text-amber-600',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  draft:           'Borrador',
+  sandbox:         '🧪 Sandbox',
+  running:         'Activa',
+  paused:          'Pausada',
+  scheduled:       'Programada',
+  completed:       'Completada',
+  failed:          'Fallida',
+  pending:         'Pendiente',
+  called:          'Llamado',
+  sandbox_pending: 'En sandbox',
+  sandbox:         '🧪 Sandbox',
 };
 
 const CALL_STATUS_LABEL: Record<string, string> = {
@@ -45,7 +61,7 @@ function RecipientRow({ r, stepLabels }: { r: CampaignRecipient; stepLabels: Rec
       <td className="px-4 py-3 text-sm text-slate-500 font-mono">{r.contact.phone}</td>
       <td className="px-4 py-3">
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[r.status] ?? 'bg-slate-100 text-slate-500'}`}>
-          {r.status === 'pending' ? 'Pendiente' : r.status === 'called' ? 'Llamado' : 'Fallido'}
+          {STATUS_LABEL[r.status] ?? r.status}
         </span>
       </td>
       <td className="px-4 py-3">
@@ -146,10 +162,10 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${STATUS_COLORS[campaign.status] ?? 'bg-slate-100 text-slate-600'}`}>
-            {campaign.status}
+            {STATUS_LABEL[campaign.status] ?? campaign.status}
           </span>
           <AddRecipientsModal campaignId={campaign.id} tenantId={tenantId} />
-          <CampaignActions campaignId={campaign.id} status={campaign.status} pendingCount={pendingCount} />
+          <CampaignActions campaignId={campaign.id} status={campaign.status} pendingCount={pendingCount} totalCount={stats.totalRecipients} />
         </div>
       </div>
 
@@ -202,6 +218,9 @@ export default async function CampaignResultsPage({ params }: { params: Promise<
               <span>{stats.recipientsByStatus['called'] ?? 0} llamados</span>
               {(stats.recipientsByStatus['failed'] ?? 0) > 0 && (
                 <span className="text-red-500">{stats.recipientsByStatus['failed']} fallidos</span>
+              )}
+              {(stats.recipientsByStatus['sandbox'] ?? 0) > 0 && (
+                <span className="text-amber-600">🧪 {stats.recipientsByStatus['sandbox']} sandbox</span>
               )}
             </div>
           </div>

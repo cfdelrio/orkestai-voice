@@ -15,7 +15,7 @@ const logger = createLogger('CallWorker');
 const CONCURRENCY = parseInt(process.env.CALL_CONCURRENCY ?? '3', 10);
 
 async function processCallJob(job) {
-  const { campaignId, recipientId, tenantId, contactId, phone } = job.data;
+  const { campaignId, recipientId, tenantId, contactId, phone, sandbox } = job.data;
 
   logger.info('Processing call job', { jobId: job.id, recipientId, phone });
 
@@ -32,8 +32,12 @@ async function processCallJob(job) {
     return;
   }
 
-  // Skip if already called (idempotency on retry)
-  if (recipient.status === 'called') {
+  // Idempotency: skip if already in the expected terminal state for this job type
+  if (sandbox && recipient.status !== 'sandbox_pending') {
+    logger.info('Sandbox recipient no longer sandbox_pending — skipping', { recipientId, status: recipient.status });
+    return;
+  }
+  if (!sandbox && recipient.status === 'called') {
     logger.info('Recipient already called — skipping', { recipientId });
     return;
   }
@@ -93,12 +97,12 @@ async function processCallJob(job) {
           recipientId,
           providerCallId: callResult.providerCallId,
           status: callResult.status || 'initiated',
-          metadata: { provider: providerConfig.provider },
+          metadata: { provider: providerConfig.provider, ...(sandbox && { sandbox: true }) },
         },
       }),
       prisma.campaignRecipient.update({
         where: { id: recipientId },
-        data: { status: 'called' },
+        data: { status: sandbox ? 'sandbox' : 'called' },
       }),
     ]);
 
@@ -113,33 +117,45 @@ async function processCallJob(job) {
           recipientId,
           providerCallId: null,
           status: 'failed',
-          metadata: { error: err.message },
+          metadata: { error: err.message, ...(sandbox && { sandbox: true }) },
         },
       }),
       prisma.campaignRecipient.update({
         where: { id: recipientId },
-        data: { status: 'failed' },
+        data: { status: sandbox ? 'sandbox' : 'failed' },
       }),
     ]);
 
     throw err; // let BullMQ handle retry
   }
 
-  // After each job, check if the campaign is done
-  const pendingCount = await prisma.campaignRecipient.count({
-    where: { campaignId, status: 'pending' },
-  });
-
-  if (pendingCount === 0) {
-    const hasRunning = await prisma.campaign.findFirst({
-      where: { id: campaignId, status: 'running' },
+  // After each job, check if the campaign batch is done
+  if (sandbox) {
+    const remainingSandbox = await prisma.campaignRecipient.count({
+      where: { campaignId, status: 'sandbox_pending' },
     });
-    if (hasRunning) {
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: { status: 'completed', completedAt: new Date() },
+    if (remainingSandbox === 0) {
+      await prisma.campaign.updateMany({
+        where: { id: campaignId, status: 'sandbox' },
+        data: { status: 'draft' },
       });
-      logger.info('Campaign marked completed', { campaignId });
+      logger.info('Sandbox run complete — campaign back to draft', { campaignId });
+    }
+  } else {
+    const pendingCount = await prisma.campaignRecipient.count({
+      where: { campaignId, status: 'pending' },
+    });
+    if (pendingCount === 0) {
+      const hasRunning = await prisma.campaign.findFirst({
+        where: { id: campaignId, status: 'running' },
+      });
+      if (hasRunning) {
+        await prisma.campaign.update({
+          where: { id: campaignId },
+          data: { status: 'completed', completedAt: new Date() },
+        });
+        logger.info('Campaign marked completed', { campaignId });
+      }
     }
   }
 }

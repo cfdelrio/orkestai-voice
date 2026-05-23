@@ -124,8 +124,11 @@ export const addRecipients = (campaignId: string, contactIds: string[], token?: 
     body: JSON.stringify({ contactIds }),
   }, token);
 
-export const startCampaign = (campaignId: string, token?: string) =>
-  apiFetch(`/api/campaigns/${campaignId}/start`, { method: 'POST' }, token);
+export const startCampaign = (campaignId: string, token?: string, options?: { sandbox?: boolean; limit?: number }) =>
+  apiFetch(`/api/campaigns/${campaignId}/start`, {
+    method: 'POST',
+    body: options ? JSON.stringify(options) : undefined,
+  }, token);
 
 export const updateCampaign = (
   campaignId: string,

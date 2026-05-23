@@ -36,14 +36,16 @@ const logger = createLogger('CallService');
  * @param {string} campaignId
  * @returns {Promise<Object>} Summary of the start operation
  */
-async function startCampaign(campaignId) {
+async function startCampaign(campaignId, { sandbox = false, limit = 5 } = {}) {
   const campaign = await getCampaignById(campaignId);
 
-  // Validate campaign can be started
-  if (!['draft', 'paused', 'completed'].includes(campaign.status)) {
+  const startableStatuses = sandbox
+    ? ['draft', 'sandbox', 'paused', 'completed']
+    : ['draft', 'paused', 'completed'];
+
+  if (!startableStatuses.includes(campaign.status)) {
     throw badRequest(
-      `Campaign "${campaign.name}" is in status "${campaign.status}" and cannot be started. ` +
-      'Only "draft", "paused", or "completed" campaigns can be started.'
+      `Campaign "${campaign.name}" is in status "${campaign.status}" and cannot be started.`
     );
   }
 
@@ -53,6 +55,12 @@ async function startCampaign(campaignId) {
       'Set a flow via POST /api/campaigns/:campaignId/flow before starting.'
     );
   }
+
+  // Reset any sandbox-processed recipients back to pending so they can be re-called
+  await prisma.campaignRecipient.updateMany({
+    where: { campaignId, status: { in: ['sandbox', 'sandbox_pending'] } },
+    data: { status: 'pending' },
+  });
 
   // Load pending recipients with their contact data
   const pendingRecipients = await prisma.campaignRecipient.findMany({
@@ -67,23 +75,37 @@ async function startCampaign(campaignId) {
     );
   }
 
+  const selected = sandbox
+    ? pendingRecipients.slice(0, Math.max(1, limit))
+    : pendingRecipients;
+
   logger.info(`Starting campaign`, {
     campaignId,
     campaignName: campaign.name,
-    recipientCount: pendingRecipients.length,
+    sandbox,
+    recipientCount: selected.length,
   });
 
   // Validate provider config exists before enqueueing
   await getProviderConfigForTenant(campaign.tenantId);
 
-  // Mark campaign as running immediately
+  if (sandbox) {
+    // Pre-mark selected recipients so worker can use them for idempotency checks
+    await prisma.campaignRecipient.updateMany({
+      where: { id: { in: selected.map((r) => r.id) } },
+      data: { status: 'sandbox_pending' },
+    });
+  }
+
   await prisma.campaign.update({
     where: { id: campaignId },
-    data: { status: 'running', startedAt: new Date() },
+    data: {
+      status: sandbox ? 'sandbox' : 'running',
+      startedAt: campaign.startedAt ?? new Date(),
+    },
   });
 
-  // Enqueue one job per recipient (non-blocking)
-  const jobs = pendingRecipients.map((recipient) => ({
+  const jobs = selected.map((recipient) => ({
     name: 'initiate-call',
     data: {
       campaignId,
@@ -91,18 +113,20 @@ async function startCampaign(campaignId) {
       tenantId: campaign.tenantId,
       contactId: recipient.contact.id,
       phone: recipient.contact.phone,
+      ...(sandbox && { sandbox: true }),
     },
   }));
 
   await callQueue.addBulk(jobs);
 
-  logger.info(`Campaign jobs enqueued`, { campaignId, count: jobs.length });
+  logger.info(`Campaign jobs enqueued`, { campaignId, count: jobs.length, sandbox });
 
   return {
     campaignId,
     campaignName: campaign.name,
-    status: 'running',
+    status: sandbox ? 'sandbox' : 'running',
     enqueued: jobs.length,
+    ...(sandbox && { sandbox: true }),
   };
 }
 
@@ -193,6 +217,9 @@ async function handleWebhookEvent(event) {
   }
 
   // ─── Dispatch outgoing webhooks (fire-and-forget) ─────────────────────────
+  // Sandbox calls don't trigger outgoing webhooks
+  if (call.metadata?.sandbox) return updatedCall;
+
   const tenantId = call.campaign.tenantId;
   const callPayload = {
     callId: call.id,
@@ -222,16 +249,18 @@ async function handleWebhookEvent(event) {
 
 async function maybeDispatchCampaignCompleted(campaignId, tenantId) {
   try {
-    const pending = await prisma.campaignRecipient.count({
-      where: { campaignId, status: 'pending' },
-    });
-    if (pending > 0) return;
-
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       select: { id: true, name: true, status: true, startedAt: true, completedAt: true },
     });
     if (!campaign || campaign.status === 'completed') return;
+    // Sandbox runs don't fire campaign.completed webhook
+    if (campaign.status === 'sandbox') return;
+
+    const pending = await prisma.campaignRecipient.count({
+      where: { campaignId, status: 'pending' },
+    });
+    if (pending > 0) return;
 
     await prisma.campaign.update({
       where: { id: campaignId },
