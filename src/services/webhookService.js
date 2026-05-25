@@ -90,8 +90,79 @@ async function deleteEndpoint(tenantId, endpointId) {
 }
 
 /**
+ * Attempts to deliver a single webhook to `url` with exponential backoff retry.
+ *
+ * Retries up to `maxAttempts` times (default: 3) on network errors or non-2xx
+ * responses. Delays between attempts: 5 s, 10 s, 20 s (5s × 2^(attempt-1)).
+ *
+ * Never throws — all failures are logged so callers don't crash the process.
+ *
+ * @param {string} url          - Endpoint URL to POST to
+ * @param {string} payload      - JSON string body (already serialized)
+ * @param {string} secret       - HMAC secret for X-Orkestai-Signature header
+ * @param {string} eventName    - Event name for X-Orkestai-Event header
+ * @param {string} endpointId   - DB endpoint ID (for logging only)
+ * @param {number} [maxAttempts=3]
+ */
+async function dispatchWithRetry(url, payload, secret, eventName, endpointId, maxAttempts = 3) {
+  const signature = sign(secret, payload);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
+
+      let res;
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Orkestai-Signature': signature,
+            'X-Orkestai-Timestamp': timestamp,
+            'X-Orkestai-Event': eventName,
+          },
+          body: payload,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!res.ok) {
+        throw new Error(`Webhook returned HTTP ${res.status}`);
+      }
+
+      logger.info('Webhook delivered', { endpointId, event: eventName, status: res.status, attempt });
+      return; // success — stop retrying
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts) {
+        const delay = 5000 * Math.pow(2, attempt - 1); // 5 s, 10 s, 20 s
+        logger.warn(
+          `[webhook] Attempt ${attempt}/${maxAttempts} failed for ${url}, retrying in ${delay}ms`,
+          { endpointId, event: eventName, error: err.message },
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // All attempts exhausted — log definitively but do not throw
+  logger.error(
+    `[webhook] All ${maxAttempts} attempts failed for ${url}`,
+    { endpointId, event: eventName, error: lastError?.message },
+  );
+}
+
+/**
  * Dispatch an event to all enabled endpoints for a tenant that subscribe to it.
  * Fire-and-forget: call without await from hot paths.
+ *
+ * Each delivery is retried up to 3 times with exponential backoff (5 s / 10 s / 20 s)
+ * so that transient ENGAGE downtime doesn't cause permanent data loss.
  */
 async function dispatch(tenantId, eventName, data) {
   let endpoints;
@@ -117,31 +188,9 @@ async function dispatch(tenantId, eventName, data) {
     tenantId,
     data,
   });
-  const timestamp = Math.floor(Date.now() / 1000).toString();
 
   await Promise.allSettled(
-    targets.map(async (ep) => {
-      const signature = sign(ep.secret, payload);
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
-        const res = await fetch(ep.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Orkestai-Signature': signature,
-            'X-Orkestai-Timestamp': timestamp,
-            'X-Orkestai-Event': eventName,
-          },
-          body: payload,
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        logger.info('Webhook delivered', { endpointId: ep.id, event: eventName, status: res.status });
-      } catch (err) {
-        logger.warn('Webhook delivery failed', { endpointId: ep.id, event: eventName, error: err.message });
-      }
-    })
+    targets.map((ep) => dispatchWithRetry(ep.url, payload, ep.secret, eventName, ep.id)),
   );
 }
 

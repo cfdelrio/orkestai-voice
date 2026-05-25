@@ -1,6 +1,30 @@
 /**
  * @fileoverview Infobip implementation of the VoiceProvider interface.
  *
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  IMPORTANT: This Infobip adapter is NOT production-ready.               ║
+ * ║                                                                          ║
+ * ║  Field names in the API calls and webhook parsing are unverified         ║
+ * ║  guesses based on Infobip documentation. They have NOT been tested       ║
+ * ║  against a real Infobip account or live API responses.                   ║
+ * ║                                                                          ║
+ * ║  Before using Infobip as a voice provider in production:                 ║
+ * ║    1. Verify all API request/response field names against the official   ║
+ * ║       Infobip Voice API documentation (TTS and IVR endpoints).           ║
+ * ║    2. Test initiateCall() with a real Infobip sandbox/trial account.     ║
+ * ║    3. Verify InfobipWebhookAdapter field names against real callbacks.   ║
+ * ║    4. Confirm the correct status endpoint for getCallStatus().           ║
+ * ║    5. Remove this warning block after verification and smoke-testing.    ║
+ * ║                                                                          ║
+ * ║  Known unverified fields (search for TODO comments in this file and      ║
+ * ║  InfobipWebhookAdapter.js):                                              ║
+ * ║    - TTS response: messages[0].messageId, messages[0].status.name        ║
+ * ║    - IVR response: responses[0].callId, responses[0].status.name         ║
+ * ║    - getCallStatus endpoint: /tts/3/single/:id (may differ for IVR)      ║
+ * ║    - Webhook fields: id/callId/callSessionId, callStatus/status.name,    ║
+ * ║      dtmfDigit/collectedDigits, userData/customData                       ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ *
  * Strategy:
  *  - Flows with ONLY "say"/"goodbye" steps → POST /tts/3/single (simple TTS call)
  *  - Flows with "dtmf_question" steps      → POST /voice/1/ivr/1/scenarios (create)
@@ -49,6 +73,16 @@ class InfobipVoiceProvider extends VoiceProvider {
   }
 
   async initiateCall(params) {
+    // ── NOT PRODUCTION-READY ─────────────────────────────────────────────────
+    // API field names used in this method are unverified guesses. Do NOT enable
+    // Infobip as a voice provider until this adapter has been smoke-tested
+    // against a real Infobip account. See the file-level JSDoc for details.
+    logger.error(
+      '[infobip] WARNING: Using unverified Infobip adapter — API field names have NOT been ' +
+      'verified against the real Infobip Voice API. Calls may fail silently or corrupt state.',
+    );
+    // ────────────────────────────────────────────────────────────────────────
+
     const { toNumber, contact, flow, webhookUrl, tenantMetadata } = params;
     const from = params.fromNumber || this.fromNumber;
 

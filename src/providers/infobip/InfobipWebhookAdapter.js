@@ -8,12 +8,17 @@
  * Only this file and InfobipVoiceProvider are allowed to reference
  * Infobip-specific field names.
  *
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  IMPORTANT: This adapter is NOT production-ready.                        ║
+ * ║                                                                          ║
+ * ║  All field names below are unverified guesses based on Infobip docs.    ║
+ * ║  They must be validated against real Infobip webhook payloads before     ║
+ * ║  enabling Infobip as a voice provider. Search for TODO comments in       ║
+ * ║  this file to find each unverified field mapping.                        ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ *
  * Infobip Voice webhook docs:
  *   https://www.infobip.com/docs/voice-and-video/outbound-calls#webhooks
- *
- * TODO: Verify all field names below against the live Infobip webhook payload.
- *       The field names used here are based on Infobip documentation and may
- *       need adjustment when tested against a real Infobip account.
  */
 
 const { createLogger } = require('../../middleware/logger');
