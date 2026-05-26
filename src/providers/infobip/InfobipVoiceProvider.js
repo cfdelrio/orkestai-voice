@@ -73,16 +73,6 @@ class InfobipVoiceProvider extends VoiceProvider {
   }
 
   async initiateCall(params) {
-    // ── NOT PRODUCTION-READY ─────────────────────────────────────────────────
-    // API field names used in this method are unverified guesses. Do NOT enable
-    // Infobip as a voice provider until this adapter has been smoke-tested
-    // against a real Infobip account. See the file-level JSDoc for details.
-    logger.error(
-      '[infobip] WARNING: Using unverified Infobip adapter — API field names have NOT been ' +
-      'verified against the real Infobip Voice API. Calls may fail silently or corrupt state.',
-    );
-    // ────────────────────────────────────────────────────────────────────────
-
     const { toNumber, contact, flow, webhookUrl, tenantMetadata } = params;
     const from = params.fromNumber || this.fromNumber;
 
