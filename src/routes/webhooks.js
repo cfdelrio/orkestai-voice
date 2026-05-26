@@ -10,6 +10,8 @@
  * POST /api/webhooks/twilio/voice
  *   Receives StatusCallback events from Twilio. Validates the
  *   X-Twilio-Signature header before processing to prevent spoofed events.
+ *   Validation is fail-closed: if TWILIO_AUTH_TOKEN is unset the request is
+ *   rejected regardless of NODE_ENV.
  *
  * Note: Webhook endpoints always respond with 200 OK to prevent the
  * provider from retrying delivery. If processing fails, the error is logged
@@ -48,15 +50,11 @@ const logger = createLogger('WebhooksRoute');
 function validateTwilioWebhook(req, res, next) {
   const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-  // In production the auth token is mandatory — fail safe if misconfigured
+  // Fail closed: if the auth token is missing in any environment, reject the request.
+  // Accepting unverified webhooks is a P0 security issue — never skip validation.
   if (!authToken) {
-    if (process.env.NODE_ENV === 'production') {
-      logger.error('[twilio-webhook] TWILIO_AUTH_TOKEN not configured in production');
-      return res.status(500).send({ error: 'TWILIO_AUTH_TOKEN not configured' });
-    }
-    // In dev/test, warn and continue so local testing is easier
-    logger.warn('[twilio-webhook] TWILIO_AUTH_TOKEN not set — skipping signature validation');
-    return next();
+    logger.error('[twilio-webhook] TWILIO_AUTH_TOKEN not configured — rejecting request');
+    return res.status(500).json({ error: 'Webhook validation not configured' });
   }
 
   const signature = req.headers['x-twilio-signature'];
