@@ -92,8 +92,11 @@ async function deleteEndpoint(tenantId, endpointId) {
 /**
  * Attempts to deliver a single webhook to `url` with exponential backoff retry.
  *
- * Retries up to `maxAttempts` times (default: 3) on network errors or non-2xx
- * responses. Delays between attempts: 5 s, 10 s, 20 s (5s × 2^(attempt-1)).
+ * Retries up to `maxAttempts` times (default: 4) on network errors or 5xx
+ * responses. Delays between attempts: 5 s, 15 s, 60 s.
+ *
+ * 4xx responses are NOT retried — ENGAGE rejected the request for a valid
+ * reason and resending would not help.
  *
  * Never throws — all failures are logged so callers don't crash the process.
  *
@@ -102,11 +105,12 @@ async function deleteEndpoint(tenantId, endpointId) {
  * @param {string} secret       - HMAC secret for X-Orkestai-Signature header
  * @param {string} eventName    - Event name for X-Orkestai-Event header
  * @param {string} endpointId   - DB endpoint ID (for logging only)
- * @param {number} [maxAttempts=3]
+ * @param {number} [maxAttempts=4]
  */
-async function dispatchWithRetry(url, payload, secret, eventName, endpointId, maxAttempts = 3) {
+async function dispatchWithRetry(url, payload, secret, eventName, endpointId, maxAttempts = 4) {
   const signature = sign(secret, payload);
   const timestamp = Math.floor(Date.now() / 1000).toString();
+  const delays = [5000, 15000, 60000]; // ms between attempts 1→2, 2→3, 3→4
 
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -131,28 +135,36 @@ async function dispatchWithRetry(url, payload, secret, eventName, endpointId, ma
         clearTimeout(timeoutId);
       }
 
-      if (!res.ok) {
-        throw new Error(`Webhook returned HTTP ${res.status}`);
+      if (res.ok) {
+        logger.info('Webhook delivered', { endpointId, event: eventName, status: res.status, attempt });
+        return; // success — stop retrying
       }
 
-      logger.info('Webhook delivered', { endpointId, event: eventName, status: res.status, attempt });
-      return; // success — stop retrying
+      // 4xx: ENGAGE rejected the request — no point retrying
+      if (res.status >= 400 && res.status < 500) {
+        logger.warn('[webhook] Received 4xx, not retrying', {
+          endpointId, event: eventName, status: res.status, url,
+        });
+        return;
+      }
+
+      // 5xx or unexpected status: throw so the catch block handles retry
+      throw new Error(`HTTP ${res.status}`);
     } catch (err) {
       lastError = err;
-      if (attempt < maxAttempts) {
-        const delay = 5000 * Math.pow(2, attempt - 1); // 5 s, 10 s, 20 s
-        logger.warn(
-          `[webhook] Attempt ${attempt}/${maxAttempts} failed for ${url}, retrying in ${delay}ms`,
-          { endpointId, event: eventName, error: err.message },
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
+      if (attempt === maxAttempts) break;
+      const delay = delays[attempt - 1] ?? 60000;
+      logger.warn(
+        `[webhook] Attempt ${attempt}/${maxAttempts} failed for ${url}, retrying in ${delay / 1000}s: ${err.message}`,
+        { endpointId, event: eventName, error: err.message },
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
   // All attempts exhausted — log definitively but do not throw
   logger.error(
-    `[webhook] All ${maxAttempts} attempts failed for ${url}`,
+    `[webhook] Failed after ${maxAttempts} attempts to ${url}: ${lastError?.message}`,
     { endpointId, event: eventName, error: lastError?.message },
   );
 }
@@ -161,7 +173,7 @@ async function dispatchWithRetry(url, payload, secret, eventName, endpointId, ma
  * Dispatch an event to all enabled endpoints for a tenant that subscribe to it.
  * Fire-and-forget: call without await from hot paths.
  *
- * Each delivery is retried up to 3 times with exponential backoff (5 s / 10 s / 20 s)
+ * Each delivery is retried up to 4 times with exponential backoff (5 s / 15 s / 60 s)
  * so that transient ENGAGE downtime doesn't cause permanent data loss.
  */
 async function dispatch(tenantId, eventName, data) {
