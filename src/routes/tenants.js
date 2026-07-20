@@ -79,7 +79,13 @@ router.post('/:tenantId/provider-configs', asyncHandler(async (req, res) => {
   const { provider, apiKey, baseUrl, fromNumber, metadata } = req.body;
 
   if (!provider || typeof provider !== 'string') {
-    throw badRequest('"provider" is required (e.g. "infobip")');
+    throw badRequest('"provider" is required (e.g. "twilio")');
+  }
+  if (provider.trim().toLowerCase() === 'infobip' && process.env.ALLOW_INFOBIP_UNVERIFIED !== 'true') {
+    throw badRequest(
+      'Infobip provider is not production-ready: API field names are unverified. ' +
+      'Use "twilio" or set ALLOW_INFOBIP_UNVERIFIED=true for development only.'
+    );
   }
   if (!apiKey || typeof apiKey !== 'string') {
     throw badRequest('"apiKey" is required');

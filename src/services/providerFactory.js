@@ -41,13 +41,27 @@ function createProvider(providerConfig) {
   logger.debug(`Creating provider instance`, { provider, configId: providerConfig.id });
 
   switch (provider) {
-    case 'infobip':
+    case 'infobip': {
+      // Hard block: Infobip API field names are unverified guesses (see InfobipVoiceProvider.js).
+      // Calls would fail silently or corrupt state. Set ALLOW_INFOBIP_UNVERIFIED=true to bypass
+      // during development — never set this in production.
+      if (process.env.ALLOW_INFOBIP_UNVERIFIED !== 'true') {
+        const err = new Error(
+          'Infobip voice provider is blocked: API field names have not been verified against ' +
+          'the real Infobip Voice API. See src/providers/infobip/InfobipVoiceProvider.js for ' +
+          'the verification checklist. Set ALLOW_INFOBIP_UNVERIFIED=true to bypass (dev only).'
+        );
+        err.statusCode = 503;
+        throw err;
+      }
+      logger.warn('ALLOW_INFOBIP_UNVERIFIED=true — using unverified Infobip adapter');
       return new InfobipVoiceProvider({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         fromNumber: providerConfig.fromNumber,
         metadata: providerConfig.metadata || {},
       });
+    }
 
     case 'twilio':
       return new TwilioVoiceProvider({
